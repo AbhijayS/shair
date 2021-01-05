@@ -52,6 +52,12 @@ def press(event):
     elif event.key == 'right':
         temp = destination_point(p[0], p[1], p[2]+pi/2, move, r)
         p = (temp[0], temp[1], temp[2]-pi/2)
+    elif event.key == 'left':
+        temp = destination_point(p[0], p[1], p[2]-pi/2, move, r)
+        p = (temp[0], temp[1], temp[2]+pi/2)
+    elif event.key == 'down':
+        temp = destination_point(p[0], p[1], p[2]+pi, move, r)
+        p = p = (temp[0], temp[1], temp[2]-pi)
     print(p)
 
 
