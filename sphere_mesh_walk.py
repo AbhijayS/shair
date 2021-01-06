@@ -56,6 +56,7 @@ with open('sphere.stl', 'rb') as f:
 
 points = np.array(points)
 triangles = np.array(triangles)
+
 # print(points)
 # print(triangles)
     # print(facets)
@@ -65,7 +66,8 @@ triangles = np.array(triangles)
     # print(v3)
 
 # print(al_x)
-    
+
+axes.scatter(points[0][0], points[0][1], points[0][2], c='r', s=100)
 axes.plot_trisurf(points[:,0], points[:,1], triangles, points[:,2])
 pyplot.show()
 # print(points[:,2])
@@ -74,3 +76,9 @@ pyplot.show()
 # print(mesh.vertices)
 # print(mesh.triangles)
 # print(mesh.triangles_tree)
+
+# how to travel
+# local_coordinate = rotate global xyz axes according to unit normal vector
+# if point of intersection:
+    # 
+# update lcoation in xyz on the same plane

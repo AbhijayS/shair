@@ -38,6 +38,7 @@ ax = fig.add_subplot(111, projection='3d')
 # dpnvect = to_n_vect(dp[0], dp[1], r)
 # ax.scatter(dpnvect[0], dpnvect[1], dpnvect[2], c='g', s = 100)
 
+# point: lat, lon, bearing
 p = (0, 0, 0)
 move = 1
 # keyboard interaction
