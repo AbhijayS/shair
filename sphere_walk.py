@@ -38,7 +38,7 @@ ax = fig.add_subplot(111, projection='3d')
 # dpnvect = to_n_vect(dp[0], dp[1], r)
 # ax.scatter(dpnvect[0], dpnvect[1], dpnvect[2], c='g', s = 100)
 
-p = (0, 0, 0)
+p = (radians(90), 0, pi)
 move = 1
 # keyboard interaction
 def press(event):
@@ -85,5 +85,6 @@ def animate(i):
     p_plot = ax.scatter(pnvect[0], pnvect[1], pnvect[2], c='r', s = 100)
 
 fig.canvas.mpl_connect('key_press_event', press)
-ani = animation.FuncAnimation(fig, animate, interval=1000/24)
+ani = animation.FuncAnimation(fig, animate, interval=1000/60)
+ax.set_aspect(auto)
 plt.show()
