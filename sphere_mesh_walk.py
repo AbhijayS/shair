@@ -25,12 +25,14 @@ with open('sphere.stl', 'rb') as f:
     [facets,] = struct.unpack('I', f.read(4))
     points = []
     triangles = []
+    normals = []
 
     for i in range(facets):
-        normal = struct.unpack('fff', f.read(12))
+        normal = list(struct.unpack('fff', f.read(12)))
         v1 = list(struct.unpack('fff', f.read(12)))
         v2 = list(struct.unpack('fff', f.read(12)))
         v3 = list(struct.unpack('fff', f.read(12)))
+        normals.append(normal)
         triangle = []
 
         if v1 in points:
@@ -67,7 +69,8 @@ triangles = np.array(triangles)
 
 # print(al_x)
 
-axes.scatter(points[0][0], points[0][1], points[0][2], c='r', s=100)
+# axes.scatter(points[0][0], points[0][1], points[0][2], c='r', s=100)
+axes.quiver(points[0][0], points[0][1], points[0][2], normals[0][0], normals[0][1], normals[0][2], color='r')
 axes.plot_trisurf(points[:,0], points[:,1], triangles, points[:,2])
 pyplot.show()
 # print(points[:,2])
