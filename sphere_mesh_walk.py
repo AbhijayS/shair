@@ -3,6 +3,7 @@ from mpl_toolkits import mplot3d
 from matplotlib import pyplot
 import numpy as np
 import trimesh
+import math
 
 # Create a new plot
 figure = pyplot.figure()
@@ -70,16 +71,22 @@ triangles = np.array(triangles)
 # print(al_x)
 
 # axes.scatter(points[0][0], points[0][1], points[0][2], c='r', s=100)
-axes.quiver(points[0][0], points[0][1], points[0][2], normals[0][0], normals[0][1], normals[0][2], color='r')
+z = normals[0]
+x = (points[0] - points[1])/math.hypot(*(points[0] - points[1])) # normalize
+y = (np.cross(x, z))/math.hypot(*np.cross(x, z))
+print(x,y,z)
+
+axes.quiver(*points[0], *x, color='r')
+axes.quiver(*points[0], *y, color='g')
+axes.quiver(*points[0], *z, color='b')
+
 axes.plot_trisurf(points[:,0], points[:,1], triangles, points[:,2])
 pyplot.show()
 # print(points[:,2])
 
-# mesh = trimesh.load('sphere.stl')
-# print(mesh.vertices)
-# print(mesh.triangles)
-# print(mesh.triangles_tree)
-
+# print(points[0])
+# print(points[1])
+# print(points[0]-points[1])
 # how to travel
 # local_coordinate = rotate global xyz axes according to unit normal vector
 # if point of intersection:
