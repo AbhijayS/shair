@@ -1,6 +1,6 @@
 from stl import mesh
 from mpl_toolkits import mplot3d
-from matplotlib import pyplot
+from matplotlib import pyplot, tri
 import numpy as np
 import trimesh
 import math
@@ -16,7 +16,7 @@ def transform_coordinates(local_units, global_vector):
     [0,1,0], # j-hat
     [0,0,1]  # k-hat
   ])
-  return np.matmul(np.dot(global_units, local_units), f)
+  return np.matmul(np.dot(global_units, local_units), global_vector)
 
 def intersection_point(p1,p2,p3,p4):
   # params:
@@ -102,38 +102,29 @@ with open('sphere.stl', 'rb') as f:
 points = np.array(points)
 triangles = np.array(triangles)
 
-# print(points)
-# print(triangles)
-    # print(facets)
-    # print(normal)
-    # print(v1)
-    # print(v2)
-    # print(v3)
+current_vertices = triangles[0]
+current_location = points[0]
 
-# print(al_x)
-
-# axes.scatter(points[0][0], points[0][1], points[0][2], c='r', s=100)
+# new xyz unit vectors
 z = normals[0]
-x = (points[0] - points[1])/math.hypot(*(points[0] - points[1])) # normalize
+x = (points[0] - points[1])/math.hypot(*(points[0] - points[1]))
 y = (np.cross(x, z))/math.hypot(*np.cross(x, z))
-# print(x,y,z)
 
 axes.quiver(*points[0], *x, color='r')
 axes.quiver(*points[0], *y, color='g')
 axes.quiver(*points[0], *z, color='b')
 
-axes.plot_trisurf(points[:,0], points[:,1], triangles, points[:,2])
+movement_vector = np.array([0*x, 1*y])
+edge1_vector = points[current_vertices[0]]-points[current_vertices[1]]
+print(edge1_vector)
+edge1 = np.array([current_location,transform_coordinates(np.array([x,y,z]), edge1_vector) + current_location])
+print(edge1)
+print(intersection_point(movement_vector[0], movement_vector[1], edge1[0], edge1[1]))
+
+mask = [False]*len(triangles)
+mask[0] = True
+t = tri.Triangulation(points[:,0], points[:,1], triangles, mask=mask)
+# mesh = axes.plot_trisurf(points[:,0], points[:,1], triangles, points[:,2])
+mesh = axes.plot_trisurf(t, points[:,2])
 axes.plot_trisurf(points[:,0][:3], points[:,1][:3], points[:,1][:3], color='r')
 pyplot.show()
-# print(points[:,2])
-
-# print(points[0])
-# print(points[1])
-# print(points[0]-points[1])
-# how to travel
-# local_coordinate = rotate global xyz axes according to unit normal vector
-# if point of intersection:
-    # 
-# update lcoation in xyz on the same plane
-
-# print(intersection_point([0,0], [3,3], [0,-1], [2,4]))
