@@ -20,7 +20,7 @@ def transform_coordinates(local_units, global_vector):
 
 
 def point_local_to_global(local_units, origin_point, local_point):
-  return origin_point + local_units*local_point
+  return origin_point + local_units[0]*local_point[0] + local_units[1]*local_point[1] + local_units[2]*local_point[2]
 
 def vector_local_to_global(local_units, local_vector):
   return np.sum(local_units*local_vector, axis=0)
@@ -48,11 +48,24 @@ def intersection_point(p1,p2,p3,p4):
   else:
     ua = numa/denom
     ub = numb/denom
-    if abs(ua)<=1 and abs(ub)<=1:
+    if ua>=0 and ua<=1 and ub>=0 and ub<=1:
       x = p1[0] + ua*(p2[0]-p1[0])
       y = p1[1] + ua*(p2[1]-p1[1])
       return (1, (x,y))
     return (0,)
+
+def adjacent_triangle(tri, ends):
+  # tri and ends contain point indices
+
+  global triangles
+
+  for p in tri:
+    if not p in ends:
+      third = p
+
+  for t in triangles:
+    if (ends[0] in t) and (ends[1] in t) and (not third in t):
+      return t
 
 
 # Create a new plot
@@ -125,12 +138,16 @@ u = np.cross(v, w) / math.hypot(*np.cross(v, w))
 unit_vectors = np.array([u,v,w])
 
 # relative to triangle coordinates (uvw)
-current_location = [0,0.01,0]
+location = np.array([0,0.01,0])
 
-# planar movement using uv units (w is ignored)
-movement = np.array([current_location,[1,0.01,0]])
+# planar movement using uvw units
+movement_vector = np.array([0.01,0,0])
 
-# axes.quiver(*point_local_to_global(unit_vectors, origin, current_location), *vector_local_to_global(unit_vectors, movement[1]-movement[0]), color='black')
+initial_g = point_local_to_global(unit_vectors, origin, location)
+final_g = point_local_to_global(unit_vectors, origin, location+movement_vector)
+axes.quiver(*initial_g, *(final_g-initial_g), color='black')
+axes.scatter(*initial_g, color='r', s=100)
+axes.scatter(*final_g, color='r', s=100)
 
 # edge1: v0 -> v1
 edge1_p0 = transform_coordinates(unit_vectors, v0-origin)
@@ -142,9 +159,12 @@ edge2_p1 = transform_coordinates(unit_vectors, v2-v1) + edge2_p0
 edge3_p0 = transform_coordinates(unit_vectors, v2-origin)
 edge3_p1 = transform_coordinates(unit_vectors, v0-v2) + edge3_p0
 
-i1 = intersection_point(movement[0], movement[1], edge1_p0, edge1_p1)[1]
-i2 = intersection_point(movement[0], movement[1], edge2_p0, edge2_p1)[1]
-i3 = intersection_point(movement[0], movement[1], edge3_p0, edge3_p1)
+i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
+i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
+i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+
+# i2_g = point_local_to_global(unit_vectors, origin, i2[1]+(0,))
+# axes.scatter(*i2_g, color='r', s=100)
 print(i1)
 print(i2)
 print(i3)
@@ -156,11 +176,16 @@ print(i3)
 
 axes.quiver(*origin, *u, color='r')
 axes.quiver(*origin, *v, color='g')
-axes.quiver(*origin, *w, color='b')
-# axes.quiver(*current_location, *())
+# axes.quiver(*origin, *w, color='b')
 
-mask = [False]*len(triangles)
-mask[0] = True
-t = tri.Triangulation(points[:,0], points[:,1], triangles, mask=mask)
+# four adjacent triangles
+four = np.array([
+  vertices,
+  adjacent_triangle(vertices, [vertices[0], vertices[1]]),
+  adjacent_triangle(vertices, [vertices[1], vertices[2]]),
+  adjacent_triangle(vertices, [vertices[2], vertices[0]])
+])
+
+t = tri.Triangulation(points[:,0], points[:,1], four)
 mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 pyplot.show()
