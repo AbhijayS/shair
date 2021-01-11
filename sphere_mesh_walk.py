@@ -4,6 +4,7 @@ from matplotlib import pyplot, tri
 import numpy as np
 import trimesh
 import math
+import struct
 
 def transform_coordinates(local_units, global_vector):
   # params:
@@ -75,20 +76,6 @@ def rodrigues_rotation(n1, n2, v):
   cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
   return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
-# Create a new plot
-figure = pyplot.figure()
-axes = mplot3d.Axes3D(figure)
-
-# Load the STL files and add the vectors to the plot
-# your_mesh = mesh.Mesh.from_file('sphere.stl')
-# axes.add_collection3d(mplot3d.art3d.Poly3DCollection(your_mesh.vectors))
-
-# Auto scale to the mesh size
-# print(your_mesh.points)
-# scale = your_mesh.points.flatten(-1)
-# axes.auto_scale_xyz(scale, scale, scale)
-
-import struct
 
 with open('sphere.stl', 'rb') as f:
     f.seek(80)
@@ -129,23 +116,32 @@ with open('sphere.stl', 'rb') as f:
 points = np.array(points)
 triangles = np.array(triangles)
 
-vertices = triangles[0]
+# Create a new plot
+figure = pyplot.figure()
+axes = mplot3d.Axes3D(figure)
+
+# starting triangle and vertices
+triangle = 0
+vertices = triangles[triangle]
 v0 = points[vertices[0]]
 v1 = points[vertices[1]]
 v2 = points[vertices[2]]
 
-# triangle coordinates origin point
-# always the first vertex in the triangle
+# initial coordinate system
+# created at v0 of triangle
+# unit vectors: uvw
 origin = v0
-
-# triangle coordinates unit vectors uvw
-w = np.array(normals[0])
-v = (v1-v0) / math.hypot(*(v1-v0))
-u = np.cross(v, w) / math.hypot(*np.cross(v, w))
+w = np.array(normals[triangle])
+v = (v1-v0) / np.linalg.norm(v1-v0)
+u = np.cross(v, w) / np.linalg.norm(np.cross(v, w))
 unit_vectors = np.array([u,v,w])
 
-# relative to triangle coordinates (uvw)
-location = np.array([0,0.01,0])
+# initial starting location
+# in reference to uvw units
+location = np.array([-0.003,0.01,0])
+
+# move origin to new location
+origin = point_local_to_global(unit_vectors, origin, location)
 
 # planar movement using uvw units
 movement_vector = np.array([0.01,0,0])
