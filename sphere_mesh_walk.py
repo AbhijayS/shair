@@ -5,7 +5,6 @@ import numpy as np
 import trimesh
 import math
 
-
 def transform_coordinates(local_units, global_vector):
   # params:
     # local_units := local unit vectors expressed using the global system
@@ -17,7 +16,6 @@ def transform_coordinates(local_units, global_vector):
     [0,0,1]  # k-hat
   ])
   return np.matmul(np.dot(global_units, local_units), global_vector)
-
 
 def point_local_to_global(local_units, origin_point, local_point):
   return origin_point + local_units[0]*local_point[0] + local_units[1]*local_point[1] + local_units[2]*local_point[2]
@@ -56,17 +54,26 @@ def intersection_point(p1,p2,p3,p4):
 
 def adjacent_triangle(tri, ends):
   # tri and ends contain point indices
-
+  # returns adj triangle and its normal
   global triangles
 
   for p in tri:
     if not p in ends:
       third = p
 
-  for t in triangles:
+  for i in range(len(triangles)):
+    t = triangles[i]
     if (ends[0] in t) and (ends[1] in t) and (not third in t):
-      return t
+      n = normals[i]
+      return (t,n)
 
+# https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+def rodrigues_rotation(n1, n2, v):
+  cross = np.cross(n1, n2)
+  a = cross / np.linalg.norm(cross)
+  sinphi = np.linalg.norm(np.cross(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2)))
+  cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
+  return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
 # Create a new plot
 figure = pyplot.figure()
@@ -169,6 +176,15 @@ print(i1)
 print(i2)
 print(i3)
 
+
+if i1[0]==1:
+  new_tri, new_norm = adjacent_triangle(vertices, [0,1])
+  new_units = np.array(list(map(lambda x: rodrigues_rotation(w, new_norm, x), unit_vectors)))
+  print(new_units)
+  axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
+  axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
+
+
 # i1_g = origin + u*i1[0] + v*i1[1]
 # i2_g = origin + u*i2[0] + v*i2[1]
 # axes.scatter(i1_g[0], i1_g[1], i1_g[2], s=100, c='r')
@@ -181,11 +197,10 @@ axes.quiver(*origin, *v, color='g')
 # four adjacent triangles
 four = np.array([
   vertices,
-  adjacent_triangle(vertices, [vertices[0], vertices[1]]),
-  adjacent_triangle(vertices, [vertices[1], vertices[2]]),
-  adjacent_triangle(vertices, [vertices[2], vertices[0]])
+  adjacent_triangle(vertices, [vertices[0], vertices[1]])[0],
+  adjacent_triangle(vertices, [vertices[1], vertices[2]])[0],
+  adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]
 ])
-
 t = tri.Triangulation(points[:,0], points[:,1], four)
 mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 pyplot.show()
