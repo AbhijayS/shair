@@ -86,6 +86,6 @@ def animate(i):
     p_plot = ax.scatter(pnvect[0], pnvect[1], pnvect[2], c='r', s = 100)
 
 fig.canvas.mpl_connect('key_press_event', press)
-ani = animation.FuncAnimation(fig, animate, interval=1000/60)
+ani = animation.FuncAnimation(fig, animate, interval=1000/24)
 ax.set_aspect(auto)
 plt.show()

@@ -143,14 +143,8 @@ location = np.array([-0.003,0.01,0])
 # move origin to new location
 origin = point_local_to_global(unit_vectors, origin, location)
 
-# planar movement using uvw units
-movement_vector = np.array([0.01,0,0])
-
-initial_g = point_local_to_global(unit_vectors, origin, location)
-final_g = point_local_to_global(unit_vectors, origin, location+movement_vector)
-axes.quiver(*initial_g, *(final_g-initial_g), color='black')
-axes.scatter(*initial_g, color='r', s=100)
-axes.scatter(*final_g, color='r', s=100)
+# set location to zero
+location = np.array([0,0,0])
 
 # edge1: v0 -> v1
 edge1_p0 = transform_coordinates(unit_vectors, v0-origin)
@@ -162,16 +156,19 @@ edge2_p1 = transform_coordinates(unit_vectors, v2-v1) + edge2_p0
 edge3_p0 = transform_coordinates(unit_vectors, v2-origin)
 edge3_p1 = transform_coordinates(unit_vectors, v0-v2) + edge3_p0
 
-i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
-i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
-i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+# # planar movement using uvw units
+# movement_vector = np.array([0.01,0,0])
+
+# initial_g = point_local_to_global(unit_vectors, origin, location)
+# final_g = point_local_to_global(unit_vectors, origin, location+movement_vector)
+# axes.quiver(*initial_g, *(final_g-initial_g), color='black')
+# axes.scatter(*initial_g, color='r', s=100)
+# axes.scatter(*final_g, color='r', s=100)
+
+
 
 # i2_g = point_local_to_global(unit_vectors, origin, i2[1]+(0,))
 # axes.scatter(*i2_g, color='r', s=100)
-print(i1)
-print(i2)
-print(i3)
-
 
 if i1[0]==1:
   new_tri, new_norm = adjacent_triangle(vertices, [0,1])
@@ -179,12 +176,6 @@ if i1[0]==1:
   print(new_units)
   axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
   axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
-
-
-# i1_g = origin + u*i1[0] + v*i1[1]
-# i2_g = origin + u*i2[0] + v*i2[1]
-# axes.scatter(i1_g[0], i1_g[1], i1_g[2], s=100, c='r')
-# axes.scatter(i2_g[0], i2_g[1], i2_g[2], s=100, c='b')
 
 axes.quiver(*origin, *u, color='r')
 axes.quiver(*origin, *v, color='g')
@@ -199,4 +190,35 @@ four = np.array([
 ])
 t = tri.Triangulation(points[:,0], points[:,1], four)
 mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
+
+def animate(i):
+  pass
+
+move = 0.05
+def press(event):
+  global location
+  global edge1_p0
+  global edge1_p1
+  global edge2_p0
+  global edge2_p1
+  global edge3_p0
+  global edge3_p1
+
+  if event.key == 'up':
+    movement_vector = np.array([0,move,0])
+  elif event.key == 'right':
+    movement_vector = np.array([move,0,0])
+  elif event.key == 'down':
+    movement_vector = np.array([0,-move,0])
+  elif event.key == 'left':
+    movement_vector = np.array([-move,0,0])
+  
+  # calculate intersections
+  i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
+  i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
+  i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+
+
+fig.canvas.mpl_connect('key_press_event', press)
+ani = animation.FuncAnimation(fig, animate, interval=1000/24)
 pyplot.show()
