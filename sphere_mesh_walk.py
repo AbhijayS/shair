@@ -1,6 +1,7 @@
 from stl import mesh
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot, tri
+import matplotlib.animation as animation
 import numpy as np
 import trimesh
 import math
@@ -117,8 +118,8 @@ points = np.array(points)
 triangles = np.array(triangles)
 
 # Create a new plot
-figure = pyplot.figure()
-axes = mplot3d.Axes3D(figure)
+fig = pyplot.figure()
+axes = mplot3d.Axes3D(fig)
 
 # starting triangle and vertices
 triangle = 0
@@ -143,7 +144,7 @@ location = np.array([-0.003,0.01,0])
 # move origin to new location
 origin = point_local_to_global(unit_vectors, origin, location)
 
-# set location to zero
+# set location back to zero (origin)
 location = np.array([0,0,0])
 
 # edge1: v0 -> v1
@@ -156,45 +157,31 @@ edge2_p1 = transform_coordinates(unit_vectors, v2-v1) + edge2_p0
 edge3_p0 = transform_coordinates(unit_vectors, v2-origin)
 edge3_p1 = transform_coordinates(unit_vectors, v0-v2) + edge3_p0
 
-# # planar movement using uvw units
-# movement_vector = np.array([0.01,0,0])
-
-# initial_g = point_local_to_global(unit_vectors, origin, location)
-# final_g = point_local_to_global(unit_vectors, origin, location+movement_vector)
-# axes.quiver(*initial_g, *(final_g-initial_g), color='black')
-# axes.scatter(*initial_g, color='r', s=100)
-# axes.scatter(*final_g, color='r', s=100)
-
-
-
-# i2_g = point_local_to_global(unit_vectors, origin, i2[1]+(0,))
-# axes.scatter(*i2_g, color='r', s=100)
-
-if i1[0]==1:
-  new_tri, new_norm = adjacent_triangle(vertices, [0,1])
-  new_units = np.array(list(map(lambda x: rodrigues_rotation(w, new_norm, x), unit_vectors)))
-  print(new_units)
-  axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
-  axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
-
-axes.quiver(*origin, *u, color='r')
-axes.quiver(*origin, *v, color='g')
-# axes.quiver(*origin, *w, color='b')
-
-# four adjacent triangles
-four = np.array([
-  vertices,
-  adjacent_triangle(vertices, [vertices[0], vertices[1]])[0],
-  adjacent_triangle(vertices, [vertices[1], vertices[2]])[0],
-  adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]
-])
-t = tri.Triangulation(points[:,0], points[:,1], four)
-mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
-
 def animate(i):
-  pass
+  global triangle
+  global vertices
+  global axes
+  global origin
+  global points
 
-move = 0.05
+  axes.clear()
+  
+  # draw location marker and unit vectors
+  axes.scatter(*origin, color='r', s=100)
+  axes.quiver(*origin, *u, color='r')
+  axes.quiver(*origin, *v, color='g')
+  # axes.quiver(*origin, *w, color='b')
+  
+  # four adjacent triangles
+  four = np.array([
+    vertices,
+    adjacent_triangle(vertices, [vertices[0], vertices[1]])[0],
+    adjacent_triangle(vertices, [vertices[1], vertices[2]])[0],
+    adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]
+  ])
+  t = tri.Triangulation(points[:,0], points[:,1], four)
+  mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
+
 def press(event):
   global location
   global edge1_p0
@@ -203,6 +190,9 @@ def press(event):
   global edge2_p1
   global edge3_p0
   global edge3_p1
+  global unit_vectors
+
+  move = 0.05
 
   if event.key == 'up':
     movement_vector = np.array([0,move,0])
@@ -217,6 +207,28 @@ def press(event):
   i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
   i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
   i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+
+  while movement_vector != [0,0,0]:
+    if i1[0]==1 and i2[0]!=1 and i3[0]!=1:
+      new_tri, new_norm = adjacent_triangle(vertices, [0,1])
+      new_units = np.array(list(map(lambda x: rodrigues_rotation(unit_vectors[2], new_norm, x), unit_vectors)))
+      print(new_units)
+      axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
+      axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
+      # reassign unit vector
+      # move origin
+      # update movement_vector
+    elif i2[0]==1 and i1[0]!=1 and i3[0]!=1:
+    elif i3[0]==1 and i1[0]!=1 and i2[0]!=1:
+    elif i3[0]==0 and i2[0]==0 and i3[0]==0:
+      movement_vector = 0
+    else:
+      print("uh oh")
+
+
+
+  print(movement_vector)
+
 
 
 fig.canvas.mpl_connect('key_press_event', press)
