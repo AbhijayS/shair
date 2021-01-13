@@ -48,15 +48,15 @@ def intersection_point(p1,p2,p3,p4):
   else:
     ua = numa/denom
     ub = numb/denom
-    if ua>=0 and ua<=1 and ub>=0 and ub<=1:
+    if ua>0 and ua<1 and ub>0 and ub<1:
       x = p1[0] + ua*(p2[0]-p1[0])
       y = p1[1] + ua*(p2[1]-p1[1])
       return (1, (x,y))
     return (0,)
 
-def adjacent_triangle(tri, ends):
+def adjacent_triangle(tri, ends): 
   # tri and ends contain point indices
-  # returns adj triangle and its normal
+  # returns adj triangle index and its normal
   global triangles
 
   for p in tri:
@@ -67,11 +67,13 @@ def adjacent_triangle(tri, ends):
     t = triangles[i]
     if (ends[0] in t) and (ends[1] in t) and (not third in t):
       n = normals[i]
-      return (t,n)
+      return (i,n)
 
 # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
 def rodrigues_rotation(n1, n2, v):
   cross = np.cross(n1, n2)
+  if not cross.any():
+    return v
   a = cross / np.linalg.norm(cross)
   sinphi = np.linalg.norm(np.cross(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2)))
   cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
@@ -139,30 +141,29 @@ unit_vectors = np.array([u,v,w])
 
 # initial starting location
 # in reference to uvw units
-location = np.array([-0.003,0.01,0])
+location = np.array([-0.003,0.01,0.])
 
 # move origin to new location
 origin = point_local_to_global(unit_vectors, origin, location)
 
 # set location back to zero (origin)
-location = np.array([0,0,0])
-
-# edge1: v0 -> v1
-edge1_p0 = transform_coordinates(unit_vectors, v0-origin)
-edge1_p1 = transform_coordinates(unit_vectors, v1-v0) + edge1_p0
-# edge2: v1 -> v2
-edge2_p0 = transform_coordinates(unit_vectors, v1-origin)
-edge2_p1 = transform_coordinates(unit_vectors, v2-v1) + edge2_p0
-# edge3: v2 -> v0
-edge3_p0 = transform_coordinates(unit_vectors, v2-origin)
-edge3_p1 = transform_coordinates(unit_vectors, v0-v2) + edge3_p0
-
+# always zero (relative to origin)
+location = np.array([0.,0.,0.])
+print(rodrigues_rotation(np.array([0.14623966813087463, 0.05613614618778229, 0.9876551628112793]), np.array([0.14623966813087463, 0.05613614618778229, 0.9876551628112793]), np.array([0,0,1])))
+prev_origin = None
 def animate(i):
+  global triangles
   global triangle
   global vertices
   global axes
   global origin
   global points
+  global prev_origin
+
+  if np.array_equal(prev_origin, origin):
+    return
+
+  prev_origin = origin
 
   axes.clear()
   
@@ -175,62 +176,147 @@ def animate(i):
   # four adjacent triangles
   four = np.array([
     vertices,
-    adjacent_triangle(vertices, [vertices[0], vertices[1]])[0],
-    adjacent_triangle(vertices, [vertices[1], vertices[2]])[0],
-    adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]
+    triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
+    triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
+    triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
   ])
   t = tri.Triangulation(points[:,0], points[:,1], four)
   mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 
 def press(event):
   global location
-  global edge1_p0
-  global edge1_p1
-  global edge2_p0
-  global edge2_p1
-  global edge3_p0
-  global edge3_p1
+  # global edge1_p0
+  # global edge1_p1
+  # global edge2_p0
+  # global edge2_p1
+  # global edge3_p0
+  # global edge3_p1
   global unit_vectors
+  global origin
+  global vertices
+  global v0
+  global v1
+  global v2
+  global u
+  global v
+  global w
+  global triangle
 
-  move = 0.05
+  move = 0.005
+
+  print(event.key)
 
   if event.key == 'up':
-    movement_vector = np.array([0,move,0])
+    movement_vector = np.array([0.,move,0.])
   elif event.key == 'right':
-    movement_vector = np.array([move,0,0])
+    movement_vector = np.array([move,0.,0.])
   elif event.key == 'down':
-    movement_vector = np.array([0,-move,0])
+    movement_vector = np.array([0.,-move,0.])
   elif event.key == 'left':
-    movement_vector = np.array([-move,0,0])
-  
-  # calculate intersections
-  i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
-  i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
-  i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+    movement_vector = np.array([-move,0.,0.])
+  else:
+    return
 
-  while movement_vector != [0,0,0]:
+  previous_intersection_edge = None
+
+  while not np.array_equal(movement_vector, [0,0,0]):
+    # calculate intersections
+    # edge1: v0 -> v1
+    if not np.array_equal(previous_intersection_edge, [v1,v0]):
+      edge1_p0 = transform_coordinates(unit_vectors, v0-origin)
+      edge1_p1 = transform_coordinates(unit_vectors, v1-v0) + edge1_p0
+      i1 = intersection_point(location, location+movement_vector, edge1_p0, edge1_p1)
+    else:
+      i1 = (0,)
+
+    # edge2: v1 -> v2
+    if not np.array_equal(previous_intersection_edge, [v2,v1]):
+      edge2_p0 = transform_coordinates(unit_vectors, v1-origin)
+      edge2_p1 = transform_coordinates(unit_vectors, v2-v1) + edge2_p0
+      i2 = intersection_point(location, location+movement_vector, edge2_p0, edge2_p1)
+    else:
+      i2 = (0,)
+
+    # edge3: v2 -> v0
+    if not np.array_equal(previous_intersection_edge, [v0,v2]):
+      edge3_p0 = transform_coordinates(unit_vectors, v2-origin)
+      edge3_p1 = transform_coordinates(unit_vectors, v0-v2) + edge3_p0
+      i3 = intersection_point(location, location+movement_vector, edge3_p0, edge3_p1)
+    else:
+      i3 = (0,)
+
+    print("mov:" + str(movement_vector))
+    print("tri: " + str(triangle))
+    print("prev:" + str(previous_intersection_edge))
+    print(i1,i2,i3)
+    print("")
+
     if i1[0]==1 and i2[0]!=1 and i3[0]!=1:
-      new_tri, new_norm = adjacent_triangle(vertices, [0,1])
-      new_units = np.array(list(map(lambda x: rodrigues_rotation(unit_vectors[2], new_norm, x), unit_vectors)))
-      print(new_units)
-      axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
-      axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
-      # reassign unit vector
-      # move origin
-      # update movement_vector
+      previous_intersection_edge = [v0, v1]
+      
+      # update movement vector
+      movement_vector = movement_vector-(i1[1]+(0,))
+
+      # update origin point to intersection point
+      origin = point_local_to_global(unit_vectors, origin, i1[1]+(0,))
+      
+      # calculate new triangle and vertices
+      triangle, new_norm = adjacent_triangle(vertices, [vertices[0], vertices[1]])
+      vertices = triangles[triangle]
+      v0,v1,v2 = map(lambda v: points[v], vertices)
+
+      # calculate new unit vectors on new triangle
+      unit_vectors = np.array(list(map(lambda x: rodrigues_rotation(unit_vectors[2], new_norm, x), unit_vectors)))
+      u,v,w = unit_vectors
+
+      # axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
+      # axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
+
     elif i2[0]==1 and i1[0]!=1 and i3[0]!=1:
+      previous_intersection_edge = [v1, v2]
+
+      # update movement vector
+      movement_vector = movement_vector-(i2[1]+(0,))
+
+      # update origin point to intersection point
+      origin = point_local_to_global(unit_vectors, origin, i2[1]+(0,))
+      
+      # calculate new triangle and vertices
+      triangle, new_norm = adjacent_triangle(vertices, [vertices[1], vertices[2]])
+      vertices = triangles[triangle]
+      v0,v1,v2 = map(lambda v: points[v], vertices)
+
+      # calculate new unit vectors on new triangle
+      unit_vectors = np.array(list(map(lambda x: rodrigues_rotation(unit_vectors[2], new_norm, x), unit_vectors)))
+      u,v,w = unit_vectors
+
     elif i3[0]==1 and i1[0]!=1 and i2[0]!=1:
+      previous_intersection_edge = [v2, v0]
+
+      # update movement vector
+      movement_vector = movement_vector-(i3[1]+(0,))
+
+      # update origin point to intersection point
+      origin = point_local_to_global(unit_vectors, origin, i3[1]+(0,))
+      
+      # calculate new triangle and vertices
+      triangle, new_norm = adjacent_triangle(vertices, [vertices[2], vertices[0]])
+      vertices = triangles[triangle]
+      v0,v1,v2 = map(lambda v: points[v], vertices)
+
+      # calculate new unit vectors on new triangle
+      unit_vectors = np.array(list(map(lambda x: rodrigues_rotation(unit_vectors[2], new_norm, x), unit_vectors)))
+      u,v,w = unit_vectors
+
     elif i3[0]==0 and i2[0]==0 and i3[0]==0:
-      movement_vector = 0
+      previous_intersection_edge = None
+      origin = point_local_to_global(unit_vectors, origin, movement_vector)
+      movement_vector = [0,0,0]
+
     else:
       print("uh oh")
-
-
-
-  print(movement_vector)
-
-
+      break
 
 fig.canvas.mpl_connect('key_press_event', press)
-ani = animation.FuncAnimation(fig, animate, interval=1000/24)
+ani = animation.FuncAnimation(fig, animate, interval=1000/2)
 pyplot.show()
