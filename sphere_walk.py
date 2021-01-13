@@ -87,5 +87,5 @@ def animate(i):
 
 fig.canvas.mpl_connect('key_press_event', press)
 ani = animation.FuncAnimation(fig, animate, interval=1000/24)
-ax.set_aspect(auto)
+# ax.set_aspect(auto)
 plt.show()

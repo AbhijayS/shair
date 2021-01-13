@@ -160,10 +160,10 @@ def animate(i):
   global points
   global prev_origin
 
-  if np.array_equal(prev_origin, origin):
-    return
+  # if np.array_equal(prev_origin, origin):
+  #   return
 
-  prev_origin = origin
+  # prev_origin = origin
 
   axes.clear()
   
@@ -171,7 +171,7 @@ def animate(i):
   axes.scatter(*origin, color='r', s=100)
   axes.quiver(*origin, *u, color='r')
   axes.quiver(*origin, *v, color='g')
-  # axes.quiver(*origin, *w, color='b')
+  axes.quiver(*origin, *w, color='b')
   
   # four adjacent triangles
   four = np.array([
@@ -203,8 +203,11 @@ def press(event):
   global triangle
 
   move = 0.005
+  rotate = -math.radians(5)
 
   print(event.key)
+
+  movement_vector = [0,0,0]
 
   if event.key == 'up':
     movement_vector = np.array([0.,move,0.])
@@ -214,6 +217,22 @@ def press(event):
     movement_vector = np.array([0.,-move,0.])
   elif event.key == 'left':
     movement_vector = np.array([-move,0.,0.])
+  elif event.key == 'e':
+    unit_vectors = np.matmul([
+      [math.cos(rotate), -math.sin(rotate), 0],
+      [math.sin(rotate), math.cos(rotate), 0],
+      [0,0,1]
+    ], unit_vectors)
+    u,v,w = unit_vectors
+    return
+  elif event.key == 'r':
+    unit_vectors = np.matmul([
+      [math.cos(-rotate), -math.sin(-rotate), 0],
+      [math.sin(-rotate), math.cos(-rotate), 0],
+      [0,0,1]
+    ], unit_vectors)
+    u,v,w = unit_vectors
+    return
   else:
     return
 
@@ -245,11 +264,11 @@ def press(event):
     else:
       i3 = (0,)
 
-    print("mov:" + str(movement_vector))
-    print("tri: " + str(triangle))
-    print("prev:" + str(previous_intersection_edge))
-    print(i1,i2,i3)
-    print("")
+    # print("mov:" + str(movement_vector))
+    # print("tri: " + str(triangle))
+    # print("prev:" + str(previous_intersection_edge))
+    # print(i1,i2,i3)
+    # print("")
 
     if i1[0]==1 and i2[0]!=1 and i3[0]!=1:
       previous_intersection_edge = [v0, v1]
