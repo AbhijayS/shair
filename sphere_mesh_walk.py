@@ -80,7 +80,7 @@ def rodrigues_rotation(n1, n2, v):
   return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
 
-with open('sphere.stl', 'rb') as f:
+with open('MeshBody1.stl', 'rb') as f:
     f.seek(80)
     [facets,] = struct.unpack('I', f.read(4))
     points = []
@@ -112,7 +112,7 @@ with open('sphere.stl', 'rb') as f:
         else:
             triangle.append(len(points))
             points.append(v3)
-        
+
         triangles.append(triangle)
         f.seek(2, 1)
 
@@ -149,7 +149,6 @@ origin = point_local_to_global(unit_vectors, origin, location)
 # set location back to zero (origin)
 # always zero (relative to origin)
 location = np.array([0.,0.,0.])
-print(rodrigues_rotation(np.array([0.14623966813087463, 0.05613614618778229, 0.9876551628112793]), np.array([0.14623966813087463, 0.05613614618778229, 0.9876551628112793]), np.array([0,0,1])))
 prev_origin = None
 def animate(i):
   global triangles
@@ -180,7 +179,7 @@ def animate(i):
     triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
     triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
   ])
-  t = tri.Triangulation(points[:,0], points[:,1], four)
+  t = tri.Triangulation(points[:,0], points[:,1], triangles)
   mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 
 def press(event):
@@ -202,7 +201,7 @@ def press(event):
   global w
   global triangle
 
-  move = 0.005
+  move = 1
   rotate = -math.radians(5)
 
   print(event.key)

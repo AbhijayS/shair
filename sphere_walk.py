@@ -29,7 +29,6 @@ def destination_point(lat, lon, bearing, dist, radius):
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
-
 # calculate final point
 # dp = destination_point(p[0], p[1], p[2], 3, r)
 # print('second ' + str(dp))
