@@ -1,4 +1,3 @@
-from stl import mesh
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot, tri
 import matplotlib.animation as animation
@@ -80,7 +79,7 @@ def rodrigues_rotation(n1, n2, v):
   return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
 
-with open('MeshBody1.stl', 'rb') as f:
+with open('tests/sphere.stl', 'rb') as f:
     f.seek(80)
     [facets,] = struct.unpack('I', f.read(4))
     points = []
