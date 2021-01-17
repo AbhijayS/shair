@@ -72,9 +72,11 @@ def animate(i):
 
     with open('clipper.csv', 'r') as f:
         reader = csv.DictReader(f)
-        line = {}
+        line = None
         for r in reader:
-            line = r 
+            line = r
+        if not line:
+            return
         line['units'] = eval(line['units'].replace('(','').replace(')','').replace('array',''))
         line['pose3d'] = eval(line['pose3d'].replace('(','').replace(')','').replace('array',''))
 

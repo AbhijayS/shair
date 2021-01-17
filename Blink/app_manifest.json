@@ -1,0 +1,14 @@
+{
+  "SchemaVersion": 1,
+  "Name": "Blink",
+  "ComponentId": "f915c350-7cfd-440b-9d9e-8e95c505b1f5",
+  "EntryPoint": "/bin/app",
+  "CmdArgs": [],
+  "Capabilities": {
+    "Gpio": [ "$TEMPLATE_LED" ],
+    "Uart": [ "$TEMPLATE_UART" ],
+    "I2cMaster": [ "$TEMPLATE_LSM6DS3_I2C" ],
+    "AllowedApplicationConnections": []
+  },
+  "ApplicationType": "Default"
+}

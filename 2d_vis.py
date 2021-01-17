@@ -18,22 +18,30 @@ pdf = None
 def animate(i):
     global pdf
     df = pd.read_csv('clipper.csv')
+    rows = len(df['timestamp'])
 
     if not df.equals(pdf):
         pdf = df
 
-        # axs[0][0].clear()
-        # axs[0][0].set_title('Pose X vs. Y')
-        # axs[0][0].plot(df['pose_x'].to_numpy(), df['pose_y'].to_numpy(), '.-b')
+        axs[0][0].clear()
+        axs[0][0].set_title('2D Pose')
+        x = []
+        y = []
+        for i in range(rows):
+            e = eval(df['pose2d'][i])
+            x.append(e[0])
+            y.append(e[1])
+        axs[0][0].plot(x, y, '.-b')
+
         # axs[0][0].spines['left'].set_position('center')
         # axs[0][0].spines['right'].set_color('none')
         # axs[0][0].spines['bottom'].set_position('center')
         # axs[0][0].spines['top'].set_color('none')
         # axs[0][0].xaxis.set_ticks_position('bottom')
         # axs[0][0].yaxis.set_ticks_position('left')
-        # axs[0][0].xaxis.set_ticks(np.arange(-4, 5, 1))
-        # axs[0][0].yaxis.set_ticks(np.arange(-2, 3, 1))
-        # axs[0][0].grid(True)
+        axs[0][0].xaxis.set_ticks(np.arange(0, 9, 1))
+        axs[0][0].yaxis.set_ticks(np.arange(0, 12, 1))
+        axs[0][0].grid(True)
 
         # axs[1][0].clear()
         # axs[1][0].set_title('Pose X vs. Time')
@@ -67,9 +75,12 @@ def animate(i):
         axs[2][1].plot(df['timestamp'], df['loop'])
 
 
-        # axs[3][0].clear()
-        # axs[3][0].set_title('Yaw vs. Time')
-        # axs[3][0].plot(df['timestamp'], df['pose_yaw'])
+        axs[3][0].clear()
+        axs[3][0].set_title('Yaw vs. Time')
+        yaws = []
+        for p in df['pose2d']:
+            yaws.append(eval(p)[2])
+        axs[3][0].plot(df['timestamp'], yaws)
 
 
         # df = pd.read_csv('mouse.data', names=['dx','dy'])

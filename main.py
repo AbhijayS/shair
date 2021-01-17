@@ -6,7 +6,7 @@ from math import *  # fix
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from multiprocessing import Process
-from config import OPTICAL_DPI, ARDUINO_COM_PORT
+import config
 import csv
 from imu import IMU
 import struct
@@ -39,8 +39,8 @@ def get_displacement_vector():
             for line in lines:
                 dx, dy = line.split(',')
                 x = x + int(dx)
-                y = y - int(dy)
-            return [x/OPTICAL_DPI, y/OPTICAL_DPI]
+                y = y + int(dy)
+            return [config.OPTICAL_SIGNS[0]*x/config.OPTICAL_DPI, config.OPTICAL_SIGNS[1]*y/config.OPTICAL_DPI]
     except IOError:
         # this should never happen
         # fix if it does
@@ -368,45 +368,41 @@ origin = point_local_to_global(unit_vectors, origin, location)
 location = np.array([0., 0., 0.])
 
 # 2d stuff
-YAW_ZERO = imu.get_euler_angles()[2]
+YAW_OFFSET = -imu.get_euler_angles()[0]
 pose2d = (0, 0, 0)  # x,y,yaw
 ts = time.perf_counter()  # timing performance
-print("IMU zeroed at {} deg.".format(YAW_ZERO))
+print("IMU zeroed at {} deg.".format(YAW_OFFSET))
 
 
 def main():
     global pose2d
     global ts
     global imu
-    global loc
-    global unit
-    global tri
     global origin
     global unit_vectors
     global triangle
     global log_file
     global log_fieldnames
+    global YAW_OFFSET
 
     # NOTE: might need to do time matching to get imu and optical data to match up
     #       though right now it doesn't seem necessary
     while True:
         imu.update()
+        motion = get_displacement_vector()
 
         old_yaw = pose2d[2]
-        new_yaw = imu.get_euler_angles()[2]
-        motion = get_displacement_vector()
-        # dP = translation_2d(motion[0], motion[1], old_yaw, new_yaw)
-        dP = translation_2d(motion[0], motion[1], old_yaw, old_yaw)
-        # pose2d = (pose2d[0]+dP[0], pose2d[1]+dP[1], new_yaw)
-        pose2d = (pose2d[0]+dP[0], pose2d[1]+dP[1], old_yaw)
+        new_yaw = imu.get_euler_angles()[0] + YAW_OFFSET
+        dP = translation_2d(motion[0], motion[1], old_yaw, new_yaw)
+        pose2d = (pose2d[0]+dP[0], pose2d[1]+dP[1], new_yaw)
         translation_3d(dP, 0)
 
         # TODO: update guard position here
 
-        # print("tri: " + str(tri))
-        # print("loc: " + str(loc))
-        # print("2d: " + str(pose2d))
-        # os.system('cls')
+        os.system('cls')
+        print("tri: " + str(triangle))
+        print("loc: " + str(origin))
+        print("2d: " + str(pose2d))
         # print(dP)
 
         with open(log_file, 'a') as f:

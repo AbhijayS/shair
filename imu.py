@@ -5,7 +5,7 @@ from ahrs import Quaternion
 import numpy as np
 import math
 import operator
-from config import ARDUINO_COM_PORT, ARDUINO_BAUD_RATE
+import config
 
 class IMU:
     # constants
@@ -13,15 +13,11 @@ class IMU:
     GAIN = 0.2
     GRAVITY = 9.80665
     SENSOR_SIGN = [1,1,1,-1,-1,-1,1,1,1] # order: gyrxyz, acclxyz, magxyz
-    # order: x y z
-    MAG_HARD_IRON = [-341.618045, -3822.569674, 4116.527667]
-    # matrix copied from magneto
-    MAG_SOFT_IRON = [1.030425, 0.007653, -0.004353,
-                    0.007653, 1.046725, -0.006299,
-                    -0.004353, -0.006299, 1.091559]
+    MAG_HARD_IRON = config.MAG_HARD_IRON
+    MAG_SOFT_IRON = config.MAG_SOFT_IRON
 
     def __init__(self):
-        ser = serial.Serial(ARDUINO_COM_PORT, ARDUINO_BAUD_RATE)
+        ser = serial.Serial(config.ARDUINO_COM_PORT, config.ARDUINO_BAUD_RATE)
         self.ser_buff = ''
 
         # clean up input buffer
@@ -131,6 +127,7 @@ def main():
             euler = myIMU.get_euler_angles()
             f.write(str(euler[0]) + "," + str(euler[1]) + "," + str(euler[2]) + "\n")
             # print(euler)
+            time.sleep(.1)
         
 if __name__ == "__main__":
     main()
