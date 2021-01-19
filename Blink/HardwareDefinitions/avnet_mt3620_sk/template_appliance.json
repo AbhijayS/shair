@@ -21,7 +21,8 @@
     "Imports" : [ {"Path": "avnet_mt3620_sk.json"} ],
     "Peripherals": [
         {"Name": "TEMPLATE_LED", "Type": "Gpio", "Mapping": "AVNET_MT3620_SK_USER_LED_RED", "Comment": "MT3620 SK: User LED."},
-        {"Name": "TEMPLATE_UART", "Type": "Uart", "Mapping": "AVNET_MT3620_SK_ISU1_UART", "Comment": "MT3620 SK: UART"},
+        {"Name": "TEMPLATE_UART_COMP", "Type": "Uart", "Mapping": "AVNET_MT3620_SK_ISU1_UART", "Comment": "MT3620 SK: COMP UART"},
+        {"Name": "TEMPLATE_UART_UBIT", "Type": "Uart", "Mapping": "AVNET_MT3620_SK_ISU0_UART", "Comment": "MT3620 SK: UBIT UART"},
         {"Name": "TEMPLATE_LSM6DS3_I2C", "Type": "I2cMaster", "Mapping": "AVNET_MT3620_SK_ISU2_I2C", "Comment": "MT3620 SK: IMU"}
     ]
 }

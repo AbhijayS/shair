@@ -6,7 +6,7 @@
   "CmdArgs": [],
   "Capabilities": {
     "Gpio": [ "$TEMPLATE_LED" ],
-    "Uart": [ "$TEMPLATE_UART" ],
+    "Uart": [ "$TEMPLATE_UART_COMP", "$TEMPLATE_UART_UBIT" ],
     "I2cMaster": [ "$TEMPLATE_LSM6DS3_I2C" ],
     "AllowedApplicationConnections": []
   },

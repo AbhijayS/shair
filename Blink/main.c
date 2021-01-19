@@ -11,12 +11,14 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <stdbool.h>
+// #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <math.h>
+
 
 // applibs_versions.h defines the API struct versions to use for applibs APIs.
 #include "applibs_versions.h"
@@ -38,11 +40,12 @@
 //
 // See https://aka.ms/AzureSphereHardwareDefinitions for more details.
 #include <hw/template_appliance.h>
-
 #include "eventloop_timer_utilities.h"
+#include "MadgwickAHRS.h"
 
-#define UPDATE_PERIOD_MS 10
-#define BILLION 1000000
+#define BILLION 1000000000
+#define GRAVITY 9.80665f
+#define DEG_TO_RAD 3.14159f / 180.0f
 
 /// <summary>
 /// Exit codes for this application. These are used for the
@@ -79,8 +82,9 @@ typedef enum {
 
     ExitCode_SendMessage_Write = 22,
     ExitCode_UartEvent_Read = 23,
-    ExitCode_Init_UartOpen = 24,
+    ExitCode_Init_Comp_UartOpen = 24,
     ExitCode_Init_RegisterIo = 25,
+    ExitCode_Init_UBit_UartOpen = 26,
 
     ExitCode_Main_EventLoopFail = 21
 } ExitCode;
@@ -99,7 +103,8 @@ static void SendUartMessage(int uartFd, const char *dataToSend);
 
 // File descriptors - initialized to invalid value
 static int i2cFd = -1;
-static int uartFd = -1;
+static int uartFd_comp = -1;
+static int uartFd_ubit = -1;
 
 static EventLoop *eventLoop = NULL;
 static EventLoopTimer *accelTimer = NULL;
@@ -112,6 +117,11 @@ static const uint8_t lsm6ds3Address = 0x6A;
 // Termination state
 static volatile sig_atomic_t exitCode = ExitCode_Success;
 
+static int16_t xl_offsets[3];
+static int16_t g_offsets[3];
+char ubit_buf[80];
+char ubit_buf_ready[80];
+
 /// <summary>
 ///     Signal handler for termination requests. This handler must be async-signal-safe.
 /// </summary>
@@ -121,19 +131,26 @@ static void TerminationHandler(int signalNumber)
     exitCode = ExitCode_TermHandler_SigTerm;
 }
 
-/// <summary>
-///     Print latest data from accelerometer.
-/// </summary>
-static void AccelTimerEventHandler(EventLoopTimer *timer)
+static float accel_meter_per_sec(int16_t a_raw)
+{
+    return a_raw * 0.061f * GRAVITY / 1000.0f;
+}
+
+static float gyro_rad_per_sec(int16_t g_raw)
+{
+    return g_raw * 8.75f * DEG_TO_RAD / 1000.0f;
+}
+
+static void readIMU(
+    int16_t *gxRaw,
+    int16_t *gyRaw,
+    int16_t *gzRaw,
+    int16_t *axRaw,
+    int16_t *ayRaw,
+    int16_t *azRaw)
 {
     static int iter = 1;
-
-    if (ConsumeEventLoopTimerEvent(timer) != 0) {
-        exitCode = ExitCode_AccelTimer_Consume;
-        return;
-    }
-
-    // Status register describes whether accelerometer is available.
+    // Status register describes whether the sensors are available.
     // DocID026899 Rev 10, S9.26, STATUS_REG (1Eh); [0] = XLDA
     static const uint8_t statusRegId = 0x1E;
     uint8_t status;
@@ -156,71 +173,134 @@ static void AccelTimerEventHandler(EventLoopTimer *timer)
         static const uint8_t outXLXl = 0x28;
         static const uint8_t outYLXl = 0x2A;
         static const uint8_t outZLXl = 0x2C;
-        int16_t gxRaw;
-        int16_t gyRaw;
-        int16_t gzRaw;
-        int16_t axRaw;
-        int16_t ayRaw;
-        int16_t azRaw;
+
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outXG, sizeof(outXG),
-                                                    (uint8_t *)&gxRaw, sizeof(gxRaw));
+                                                    (uint8_t *)gxRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTX_G)",
-                                sizeof(outXG) + sizeof(gxRaw), transferredBytes)) {
+                                sizeof(outXG) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outYG, sizeof(outYG),
-                                                    (uint8_t *)&gyRaw, sizeof(gyRaw));
+                                                    (uint8_t *)gyRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTY_G)",
-                                sizeof(outYG) + sizeof(gyRaw), transferredBytes)) {
+                                sizeof(outYG) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outZG, sizeof(outZG),
-                                                    (uint8_t *)&gzRaw, sizeof(gzRaw));
+                                                    (uint8_t *)gzRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTZ_G)",
-                                sizeof(outZG) + sizeof(gzRaw), transferredBytes)) {
+                                sizeof(outZG) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outXLXl, sizeof(outXLXl),
-                                                    (uint8_t *)&axRaw, sizeof(axRaw));
+                                                    (uint8_t *)axRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTX_L_XL)",
-                                sizeof(outXLXl) + sizeof(axRaw), transferredBytes)) {
+                                sizeof(outXLXl) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outYLXl, sizeof(outYLXl),
-                                                    (uint8_t *)&ayRaw, sizeof(ayRaw));
+                                                    (uint8_t *)ayRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTY_L_XL)",
-                                sizeof(outYLXl) + sizeof(ayRaw), transferredBytes)) {
+                                sizeof(outYLXl) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
         transferredBytes = I2CMaster_WriteThenRead(i2cFd, lsm6ds3Address, &outZLXl, sizeof(outZLXl),
-                                                    (uint8_t *)&azRaw, sizeof(azRaw));
+                                                    (uint8_t *)azRaw, sizeof(int16_t));
         if (!CheckTransferSize("I2CMaster_WriteThenRead (OUTZ_L_XL)",
-                                sizeof(outZLXl) + sizeof(azRaw), transferredBytes)) {
+                                sizeof(outZLXl) + sizeof(int16_t), transferredBytes)) {
             exitCode = ExitCode_AccelTimer_ReadZAccel;
             return;
         }
+    }
+    ++iter;
+}
 
-        // DocID026899 Rev 10, S4.1, Mechanical characteristics
-        // These constants are specific to LA_So where FS = +/-4g, as set in CTRL1_X.
-        double g = (azRaw * 0.122) / 1000.0;
-        struct timespec t;
-        clock_gettime(CLOCK_REALTIME, &t);
-        long ms = t.tv_nsec/1000000;
-        // Log_Debug("INFO: %ld: vertical acceleration: %.2lfg\n", ms, g);
-        char m[80];
-        sprintf(m, "%ld,%d,%d,%d,%d,%d,%d\n",
-        ms,
-        axRaw, ayRaw, azRaw,
-        gxRaw, gyRaw, gzRaw);
-        SendUartMessage(uartFd, m);
+/// <summary>
+///     Print latest data from accelerometer.
+/// </summary>
+static void AccelTimerEventHandler(EventLoopTimer *timer)
+{
+    if (ConsumeEventLoopTimerEvent(timer) != 0) {
+        exitCode = ExitCode_AccelTimer_Consume;
+        return;
     }
 
-    ++iter;
+    static float ax;
+    static float ay;
+    static float az;
+    static float gx;
+    static float gy;
+    static float gz;
+    static int16_t gxRaw;
+    static int16_t gyRaw;
+    static int16_t gzRaw;
+    static int16_t axRaw;
+    static int16_t ayRaw;
+    static int16_t azRaw;
+
+    readIMU(
+    &gxRaw,
+    &gyRaw,
+    &gzRaw,
+    &axRaw,
+    &ayRaw,
+    &azRaw);
+
+    ax = accel_meter_per_sec(axRaw - xl_offsets[0]);
+    ay = accel_meter_per_sec(ayRaw - xl_offsets[1]);
+    az = accel_meter_per_sec(azRaw - xl_offsets[2]);
+    gx = gyro_rad_per_sec(gxRaw - g_offsets[0]);
+    gy = gyro_rad_per_sec(gyRaw - g_offsets[1]);
+    gz = gyro_rad_per_sec(gzRaw - g_offsets[2]);
+
+    static uint8_t ticker = 0;
+    if (++ticker >= 5 && strlen(ubit_buf_ready) != 0)
+    {
+        // Log_Debug("INFO: using ubit %d\n", ticker);
+        ubit_buf_ready[0] = '\0';
+        ticker = 0;
+        float m[3];
+        char *res;
+        int i = 0;
+        while ((res = strtok(ubit_buf_ready, ",")) != NULL && i < 3)
+        {
+            m[i] = atof(res);
+            i++;
+        }
+        MadgwickAHRSupdate(gx, gy, gz, ax, ay, az, m[0], m[1], m[2]);
+    } else {
+        MadgwickAHRSupdateIMU(gx, gy, gz, ax, ay, az);
+    }
+    
+    float yaw = getYaw();
+    float pitch = getPitch();
+    float roll = getRoll();
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    long ms = t.tv_nsec/1000000;
+    char m[80];
+    sprintf(m, "%ld,%.2f,%.2f,%.2f\n", ms, yaw, pitch, roll);
+    SendUartMessage(uartFd_comp, m);
+
+    // Log_Debug("INFO: %ld\n", ms);
+
+    // DocID026899 Rev 10, S4.1, Mechanical characteristics
+    // These constants are specific to LA_So where FS = +/-4g, as set in CTRL1_X.
+    // double g = (azRaw * 0.122) / 1000.0;
+    // struct timespec t;
+    // clock_gettime(CLOCK_REALTIME, &t);
+    // long ms = t.tv_nsec/1000000;
+    // Log_Debug("INFO: %ld: vertical acceleration: %.2lfg\n", ms, g);
+    // sprintf(m, "%ld,%d,%d,%d,%d,%d,%d\n",
+    // ms,
+    // axRaw, ayRaw, azRaw,
+    // gxRaw, gyRaw, gzRaw);
+    // SendUartMessage(uartFd, m);
 }
 
 /// <summary>
@@ -348,9 +428,9 @@ static ExitCode ResetAndSetSampleRange(void)
     }
 
     // gyro
-    // Use sample range 2000 dps, with 1.66kHz frequency.
+    // Use sample range 250 dps, with 1.66kHz frequency.
     // DocID026899 Rev 10, S9.12, CTRL2_G (11h)
-    static const uint8_t setCtrl2GCommand[] = {0x11, 0x8C};
+    static const uint8_t setCtrl2GCommand[] = {0x11, 0x80};
     transferredBytes =
         I2CMaster_Write(i2cFd, lsm6ds3Address, setCtrl2GCommand, sizeof(setCtrl2GCommand));
     if (!CheckTransferSize("I2CMaster_Write (CTRL2_G)", sizeof(setCtrl2GCommand),
@@ -382,8 +462,8 @@ static ExitCode InitPeripheralsAndHandlers(void)
     }
 
     // accel setup
-    static const struct timespec i2cReadPeriod = {.tv_sec = 0, .tv_nsec = UPDATE_PERIOD_MS*BILLION};
-    accelTimer = CreateEventLoopPeriodicTimer(eventLoop, &AccelTimerEventHandler, &i2cReadPeriod);
+    static const struct timespec updatePeriod = {.tv_sec = 0, .tv_nsec = BILLION/sampleFreq};
+    accelTimer = CreateEventLoopPeriodicTimer(eventLoop, &AccelTimerEventHandler, &updatePeriod);
     if (accelTimer == NULL) {
         return ExitCode_Init_AccelTimer;
     }
@@ -426,19 +506,28 @@ static ExitCode InitPeripheralsAndHandlers(void)
     }
     
     // Create a UART_Config object, open the UART and set up UART event handler
-    UART_Config uartConfig;
+    static UART_Config uartConfig;
     UART_InitConfig(&uartConfig);
     uartConfig.baudRate = 115200;
     uartConfig.flowControl = UART_FlowControl_None;
     uartConfig.dataBits = UART_DataBits_Eight;
     uartConfig.parity = UART_Parity_None;
     uartConfig.stopBits = UART_StopBits_One;
-    uartFd = UART_Open(TEMPLATE_UART, &uartConfig);
-    if (uartFd == -1) {
-        Log_Debug("ERROR: Could not open UART: %s (%d).\n", strerror(errno), errno);
-        return ExitCode_Init_UartOpen;
+
+    // comp uart
+    uartFd_comp = UART_Open(TEMPLATE_UART_COMP, &uartConfig);
+    if (uartFd_comp == -1) {
+        Log_Debug("ERROR: Could not open COMP UART: %s (%d).\n", strerror(errno), errno);
+        return ExitCode_Init_Comp_UartOpen;
     }
-    uartEventReg = EventLoop_RegisterIo(eventLoop, uartFd, EventLoop_Input, UartEventHandler, NULL);
+
+    // ubit uart
+    uartFd_ubit = UART_Open(TEMPLATE_UART_UBIT, &uartConfig);
+    if (uartFd_ubit == -1) {
+        Log_Debug("ERROR: Could not open UBIT UART: %s (%d).\n", strerror(errno), errno);
+        return ExitCode_Init_UBit_UartOpen;
+    }
+    uartEventReg = EventLoop_RegisterIo(eventLoop, uartFd_ubit, EventLoop_Input, UartEventHandler, NULL);
     if (uartEventReg == NULL) {
         return ExitCode_Init_RegisterIo;
     }
@@ -471,7 +560,7 @@ static void ClosePeripheralsAndHandlers(void)
 
     Log_Debug("Closing file descriptors.\n");
     CloseFdAndPrintError(i2cFd, "i2c");
-    CloseFdAndPrintError(uartFd, "Uart");
+    CloseFdAndPrintError(uartFd_comp, "Uart");
 }
 
 
@@ -501,7 +590,7 @@ static void SendUartMessage(int uartFd, const char *dataToSend)
         totalBytesSent += (size_t)bytesSent;
     }
 
-    Log_Debug("Sent %zu bytes over UART in %d calls.\n", totalBytesSent, sendIterations);
+    // Log_Debug("Sent %zu bytes over UART in %d calls.\n", totalBytesSent, sendIterations);
 }
 
 
@@ -511,23 +600,72 @@ static void SendUartMessage(int uartFd, const char *dataToSend)
 /// </summary>
 static void UartEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events, void *context)
 {
-    const size_t receiveBufferSize = 256;
-    uint8_t receiveBuffer[receiveBufferSize + 1]; // allow extra byte for string termination
+    const size_t receiveBufferSize = 80;
+    uint8_t receiveBuffer[receiveBufferSize];
     ssize_t bytesRead;
 
     // Read incoming UART data. It is expected behavior that messages may be received in multiple
     // partial chunks.
-    bytesRead = read(uartFd, receiveBuffer, receiveBufferSize);
+    bytesRead = read(uartFd_ubit, receiveBuffer, receiveBufferSize);
     if (bytesRead == -1) {
-        Log_Debug("ERROR: Could not read UART: %s (%d).\n", strerror(errno), errno);
+        Log_Debug("ERROR: Could not read UBIT UART: %s (%d).\n", strerror(errno), errno);
         exitCode = ExitCode_UartEvent_Read;
         return;
     }
 
     if (bytesRead > 0) {
-        // Null terminate the buffer to make it a valid string, and print it
+        int first = -1, second = -1;
+        for (int i = 0; i < bytesRead; i++)
+        {
+            if ((char)receiveBuffer[i] == '\n')
+            {
+                if (first == -1)
+                {
+                    first = i;
+                } else if (second == -1)
+                {
+                    second = i;
+                } else {
+                    first = second;
+                    second = i;
+                }
+            }
+        }
+        // Null terminate the buffer to make it a valid string
         receiveBuffer[bytesRead] = 0;
-        Log_Debug("UART received %d bytes: '%s'.\n", bytesRead, (char *)receiveBuffer);
+
+        // not found
+        // append everything to buffer
+        if (first == -1)
+        {
+            strcat(ubit_buf, (char *)receiveBuffer);
+        }
+        // 1 found
+        // append till first
+        // append rest to buffer
+        // buf + new + \0
+        else if (second == -1)
+        {
+            char dest[80];
+            strcpy(dest, ubit_buf); // dest = buf
+            strncat(dest, (char *)receiveBuffer, first); // dest = buf + new
+            strcpy(ubit_buf_ready, dest); // ready = dest
+            
+            strcpy(ubit_buf, (char *)(receiveBuffer+first+1));
+            // Log_Debug("UART received %d bytes: '%s'.\n", bytesRead, (char *)ubit_buf_ready);
+        }
+        // >= 2 found
+        // copy last
+        // copy rest to buf
+        else {
+            char dest[80];
+            strncpy(dest, (char *)(receiveBuffer+first+1), second-first-1);
+            dest[second-first-1] = '\0';
+            strcpy(ubit_buf_ready, dest);
+
+            strcpy(ubit_buf, (char *)(receiveBuffer+second+1));
+            // Log_Debug("UART received %d bytes: '%s'.\n", bytesRead, (char *)ubit_buf_ready);
+        }
     }
 }
 
@@ -536,8 +674,40 @@ static void UartEventHandler(EventLoop *el, int fd, EventLoop_IoEvents events, v
 /// </summary>
 int main(int argc, char *argv[])
 {
+    ubit_buf[0] = '\0';
+    ubit_buf_ready[0] = '\0';
     Log_Debug("I2C accelerometer application starting.\n");
     exitCode = InitPeripheralsAndHandlers();
+
+    struct timespec req = {.tv_sec = 0, .tv_nsec = BILLION/sampleFreq}, rem;
+    for (int i = 0; i < 32; i++) {
+        static int16_t gxRaw;
+        static int16_t gyRaw;
+        static int16_t gzRaw;
+        static int16_t axRaw;
+        static int16_t ayRaw;
+        static int16_t azRaw;
+        readIMU(
+        &gxRaw,
+        &gyRaw,
+        &gzRaw,
+        &axRaw,
+        &ayRaw,
+        &azRaw);
+        xl_offsets[0] += axRaw;
+        xl_offsets[1] += ayRaw;
+        xl_offsets[2] += azRaw;
+        g_offsets[0] += gxRaw;
+        g_offsets[1] += gyRaw;
+        g_offsets[2] += gzRaw;
+        nanosleep(&req, &rem);
+    }
+    xl_offsets[0] /= 32;
+    xl_offsets[1] /= 32;
+    xl_offsets[2] /= 32;
+    g_offsets[0] /= 32;
+    g_offsets[1] /= 32;
+    g_offsets[2] /= 32;
 
     // Use event loop to wait for events and trigger handlers, until an error or SIGTERM happens
     while (exitCode == ExitCode_Success) {
