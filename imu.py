@@ -107,7 +107,7 @@ class IMU:
                     data = (self.ser_buff + raw[0]).split(',')
                     self.ser_buff = raw[1]
                 
-                print(data)
+                # print(data)
 
                 if len(data) != 4:
                     print(data)
@@ -164,6 +164,7 @@ def main():
             euler = myIMU.get_euler_angles()
             f.write(str(euler[0]) + "," + str(euler[1]) + "," + str(euler[2]) + "\n")
             # print(euler)
+            time.sleep(0.01)
         
 if __name__ == "__main__":
     main()

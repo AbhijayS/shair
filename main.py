@@ -223,12 +223,10 @@ def translation_3d(movement_2d, delta_yaw):
     global v
     global w
     global triangle
-
-    move = 1
-    rotate = -math.radians(5)
+    global SCALE
 
     previous_intersection_edge = None
-    movement_vector = np.array(movement_2d+[0])
+    movement_vector = np.array(movement_2d+[0]) * (1/SCALE)
 
     while not np.array_equal(movement_vector, [0, 0, 0]):
         # calculate intersections
@@ -259,12 +257,6 @@ def translation_3d(movement_2d, delta_yaw):
         else:
             i3 = (0,)
 
-        # print("mov:" + str(movement_vector))
-        # print("tri: " + str(triangle))
-        # print("prev:" + str(previous_intersection_edge))
-        # print(i1,i2,i3)
-        # print("")
-
         if i1[0] == 1 and i2[0] != 1 and i3[0] != 1:
             previous_intersection_edge = [v0, v1]
 
@@ -284,9 +276,6 @@ def translation_3d(movement_2d, delta_yaw):
             unit_vectors = np.array(list(map(lambda x: rodrigues_rotation(
                 unit_vectors[2], new_norm, x), unit_vectors)))
             u, v, w = unit_vectors
-
-        # axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[0], color='r')
-        # axes.quiver(*point_local_to_global(unit_vectors, origin, i1[1]+(0,)), *new_units[1], color='g')
 
         elif i2[0] == 1 and i1[0] != 1 and i3[0] != 1:
             previous_intersection_edge = [v1, v2]
@@ -337,13 +326,26 @@ def translation_3d(movement_2d, delta_yaw):
         else:
             print("uh oh")
             break
+    
+    # not the best way to do it but we rotate to the new yaw
+    rotate = math.radians(delta_yaw)
+    unit_vectors = np.matmul([
+      [math.cos(rotate), -math.sin(rotate), 0],
+      [math.sin(rotate), math.cos(rotate), 0],
+      [0,0,1]
+    ], unit_vectors)
+    u,v,w = unit_vectors
 
+    ### END OF FUNCTION ###
+
+SCALE = 4.3
 
 points, normals, triangles = read_stl('tests/sphere.stl')
 # 3d stuff
 
 # starting triangle and vertices
-triangle = 0
+
+triangle = 1799
 vertices = triangles[triangle]
 v0 = points[vertices[0]]
 v1 = points[vertices[1]]
@@ -364,16 +366,16 @@ location = np.array([-0.003, 0.01, 0.])
 
 # move origin to new location
 origin = point_local_to_global(unit_vectors, origin, location)
+origin = np.array([ 0.99051657, -0.10463586, 0.07527311])
 
 # set location back to zero (origin)
 # always zero (relative to origin)
 location = np.array([0., 0., 0.])
 
 # 2d stuff
-YAW_ZERO = imu.get_euler_angles()[2]
-pose2d = (0, 0, 0)  # x,y,yaw
+YAW_OFFSET = -imu.get_euler_angles()[1]+90
+pose2d = (0, 0, 90)  # x,y,yaw
 ts = time.perf_counter()  # timing performance
-print("IMU zeroed at {} deg.".format(YAW_ZERO))
 
 def main():
     global pose2d
@@ -384,14 +386,14 @@ def main():
     global triangle
     global log_file
     global log_fieldnames
-    global YAW_ZERO
+    global YAW_OFFSET
 
     # NOTE: might need to do time matching to get imu and optical data to match up
     #       though right now it doesn't seem necessary
     while True:
         imu.update()
         old_yaw = pose2d[2]
-        new_yaw = imu.get_euler_angles()[2] - YAW_ZERO
+        new_yaw = imu.get_euler_angles()[1] + YAW_OFFSET
 
         if old_yaw == new_yaw:
             continue
@@ -399,21 +401,23 @@ def main():
         motion = get_displacement_vector()
         dP = translation_2d(motion[0], motion[1], old_yaw, new_yaw)
         pose2d = (pose2d[0]+dP[0], pose2d[1]+dP[1], new_yaw)
-        translation_3d(dP, 0)
+        # pose2d = (0, 0, new_yaw)
+        translation_3d(list(motion), new_yaw-old_yaw)
 
         # TODO: update guard position here
 
         os.system('cls')
+        print("IMU zeroed at {} deg.".format(YAW_OFFSET))
         print("tri: " + str(triangle))
         print("loc: " + str(origin))
         print("2d: " + str(pose2d))
+        print(new_yaw-old_yaw)
         # print(dP)
 
         with open(log_file, 'a') as f:
             writer = csv.DictWriter(
                 f, delimiter=',', fieldnames=log_fieldnames)
             now = time.perf_counter()
-            # writer.writerow([now, *pose2d, *loc, 0, *motion, (now-ts)*1000])
             writer.writerow({
                 'timestamp': now,
                 'pose2d': pose2d,

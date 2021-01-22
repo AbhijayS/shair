@@ -261,18 +261,20 @@ static void AccelTimerEventHandler(EventLoopTimer *timer)
     static uint8_t ticker = 0;
     if (++ticker >= 5 && strlen(ubit_buf_ready) != 0)
     {
-        // Log_Debug("INFO: using ubit %d\n", ticker);
-        ubit_buf_ready[0] = '\0';
+        Log_Debug("INFO: using ubit %d\n", ticker);
         ticker = 0;
         float m[3];
-        char *res;
+        char *res = strtok(ubit_buf_ready, ",");
         int i = 0;
-        while ((res = strtok(ubit_buf_ready, ",")) != NULL && i < 3)
+        while (res != NULL && i < 3)
         {
             m[i] = atof(res);
             i++;
+            res = strtok(NULL, ",");
         }
+        Log_Debug("LOG: MAG %f %f %f.\n", m[0], m[1], m[2]);
         MadgwickAHRSupdate(gx, gy, gz, ax, ay, az, m[0], m[1], m[2]);
+        ubit_buf_ready[0] = '\0';
     } else {
         MadgwickAHRSupdateIMU(gx, gy, gz, ax, ay, az);
     }

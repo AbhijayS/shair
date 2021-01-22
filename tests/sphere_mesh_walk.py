@@ -200,7 +200,7 @@ def press(event):
   global w
   global triangle
 
-  move = 1
+  move = 0.1
   rotate = -math.radians(5)
 
   print(event.key)
@@ -333,6 +333,9 @@ def press(event):
     else:
       print("uh oh")
       break
+  
+  print(origin)
+  print(triangle)
 
 fig.canvas.mpl_connect('key_press_event', press)
 ani = animation.FuncAnimation(fig, animate, interval=1000/2)

@@ -79,9 +79,11 @@ def animate(i):
             return
         line['units'] = eval(line['units'].replace('(','').replace(')','').replace('array',''))
         line['pose3d'] = eval(line['pose3d'].replace('(','').replace(')','').replace('array',''))
+        
+        print(line['units'])
 
-        if prev == line['pose3d']:
-            return
+        # if prev == line['pose3d']:
+        #     return
             
         axes.clear()
         
