@@ -22,28 +22,48 @@ Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 2);
 
 
 void setup() {
-  Serial.begin(9600);           // set up Serial library at 9600 bps
+  Serial.begin(115200);           // set up Serial library at 9600 bps
   Serial.println("Stepper test!");
 
   AFMS.begin();  // create with the default frequency 1.6KHz
   //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
   
-  myMotor->setSpeed(10);  // 10 rpm   
+  myMotor->setSpeed(255);
 }
+
+float cm_per_step = 1.68/1000.0f;
+float inches_per_step = cm_per_step / 2.54f;
+float pos_inches = 0;
+float target_inches = 0;
+String received = "";
 
 void loop() {
   if (Serial.available() > 0) {
     char b = Serial.read();
-    Serial.println("Single coil steps");
-    if (b == 'w') {
-      myMotor->step(100, BACKWARD, SINGLE);    
-    } else if (b == 's') {
-      myMotor->step(100, FORWARD, SINGLE); 
+    if (b == ',') {
+      target_inches = received.toFloat();
+      received = "";
+//      Serial.print("New Target: ");
+//      Serial.println(target_inches);
     } else {
-      myMotor->release();
+      received += b;
     }
   }
-  delay(100);
+  if (target_inches > (pos_inches+2*inches_per_step)) {
+    myMotor->step(1, BACKWARD, SINGLE);
+    pos_inches += inches_per_step;
+  } else if (target_inches < (pos_inches-2*inches_per_step)) {
+    myMotor->step(1, FORWARD, SINGLE);
+    pos_inches -= inches_per_step;
+  } else {
+//    Serial.println("Done");
+    myMotor->release();
+  }
+//  Serial.print("Target: ");
+//  Serial.print(target_inches);
+//  Serial.print(" | Pos: ");
+//  Serial.println(pos_inches);
+//  delay(100);
 
 //  Serial.println("Double coil steps");
 //  myMotor->step(100, FORWARD, DOUBLE); 

@@ -17,7 +17,7 @@ class IMU:
     # MAG_SOFT_IRON = config.MAG_SOFT_IRON
 
     def __init__(self):
-        ser = serial.Serial(config.ARDUINO_COM_PORT, config.ARDUINO_BAUD_RATE, timeout=0.01)
+        ser = serial.Serial(config.IMU_COM_PORT, config.IMU_BAUD_RATE, timeout=0.01)
         self.ser_buff = ''
 
         # clean up input buffer

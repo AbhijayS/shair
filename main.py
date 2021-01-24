@@ -233,7 +233,6 @@ def rodrigues_rotation(n1, n2, v):
     cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
     return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
-
 def translation_3d(movement_2d, delta_yaw):
     global location
     global unit_vectors
