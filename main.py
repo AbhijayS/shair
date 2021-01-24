@@ -12,6 +12,7 @@ from imu import IMU
 import struct
 import numpy as np
 import sys
+import trimesh
 
 # init IMU connection
 imu = IMU()
@@ -79,8 +80,6 @@ def translation_2d(x, y, theta_1_deg, theta_2_deg):
 # TODO: speed up reading of large files
 #       checking for redundant points is too inefficient
 #           maybe try constructing triangles using redundant points?
-
-
 def read_stl(filename):
     '''
     returns:
@@ -91,7 +90,31 @@ def read_stl(filename):
         - triangles.shape => (num_triangles, 3)
             - each triangle contains 3 point indices (referencing the points array)
     '''
+    
+    mesh = trimesh.load_mesh(filename)
+    adjacent_faces = {}
 
+    for a in mesh.face_adjacency:
+        if not a[0] in adjacent_faces:
+            adjacent_faces[a[0]] = a[1]
+        else:
+            adjacent_faces[a[0]] = np.append(adjacent_faces[a[0]], a[1])
+        if not a[1] in adjacent_faces:
+            adjacent_faces[a[1]] = a[0]
+        else:
+            adjacent_faces[a[1]] = np.append(adjacent_faces[a[1]], a[0])
+
+    # print(adjacent_faces)
+    # print(mesh.vertices)
+    # print(mesh.faces)
+
+    # print(mesh.triangles[0])
+
+    points = mesh.vertices
+    normals = trimesh.triangles.normals(mesh.triangles)[0]
+    triangles = mesh.faces
+    return (points, normals, triangles, adjacent_faces)
+    
     with open(filename, 'rb') as f:
         f.seek(80)
         [facets, ] = struct.unpack('I', f.read(4))
@@ -182,24 +205,24 @@ def intersection_point(p1, p2, p3, p4):
         return (0,)
 
 
+# this is an ugly piece of crap
+# but we're using it cuz its faster than iterating over everything
 def adjacent_triangle(tri, ends):
-    # tri and ends contain point indices
-    # returns adj triangle index and its normal
+    # tri = triangle index
+    # ends = point indices
+
+    global adjacency
     global triangles
 
-    for p in tri:
-        if not p in ends:
-            third = p
-
-    for i in range(len(triangles)):
-        t = triangles[i]
-        if (ends[0] in t) and (ends[1] in t) and (not third in t):
-            n = normals[i]
-            return (i, n)
+    adj = adjacency[tri]
+    for t in adj:
+        # print(triangles[tri])
+        # print(triangles[t])
+        edgs = trimesh.graph.shared_edges([triangles[tri]], [triangles[t]])[0]
+        if (ends[0] in edgs and ends[1] in edgs):
+            return (t, normals[t])
 
 # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
-
-
 def rodrigues_rotation(n1, n2, v):
     cross = np.cross(n1, n2)
     if not cross.any():
@@ -228,7 +251,7 @@ def translation_3d(movement_2d, delta_yaw):
     previous_intersection_edge = None
     movement_vector = np.array(movement_2d+[0]) * (1/SCALE)
 
-    while not np.array_equal(movement_vector, [0, 0, 0]):
+    while not np.array_equal(movement_vector, [0., 0., 0.]):
         # calculate intersections
         # edge1: v0 -> v1
         if not np.array_equal(previous_intersection_edge, [v1, v0]):
@@ -268,7 +291,7 @@ def translation_3d(movement_2d, delta_yaw):
 
             # calculate new triangle and vertices
             triangle, new_norm = adjacent_triangle(
-                vertices, [vertices[0], vertices[1]])
+                triangle, [vertices[0], vertices[1]])
             vertices = triangles[triangle]
             v0, v1, v2 = map(lambda v: points[v], vertices)
 
@@ -288,7 +311,7 @@ def translation_3d(movement_2d, delta_yaw):
 
             # calculate new triangle and vertices
             triangle, new_norm = adjacent_triangle(
-                vertices, [vertices[1], vertices[2]])
+                triangle, [vertices[1], vertices[2]])
             vertices = triangles[triangle]
             v0, v1, v2 = map(lambda v: points[v], vertices)
 
@@ -308,7 +331,7 @@ def translation_3d(movement_2d, delta_yaw):
 
             # calculate new triangle and vertices
             triangle, new_norm = adjacent_triangle(
-                vertices, [vertices[2], vertices[0]])
+                triangle, [vertices[2], vertices[0]])
             vertices = triangles[triangle]
             v0, v1, v2 = map(lambda v: points[v], vertices)
 
@@ -340,7 +363,7 @@ def translation_3d(movement_2d, delta_yaw):
 
 SCALE = 4.3
 
-points, normals, triangles = read_stl('tests/sphere.stl')
+points, normals, triangles, adjacency = read_stl('tests/sphere.stl')
 # 3d stuff
 
 # starting triangle and vertices
@@ -377,6 +400,12 @@ YAW_OFFSET = -imu.get_euler_angles()[1]+90
 pose2d = (0, 0, 90)  # x,y,yaw
 ts = time.perf_counter()  # timing performance
 
+def approxRollingAverage(avg, new_sample, count):
+    if avg:
+        return (avg * (count-1) + new_sample) / count
+    return new_sample
+
+
 def main():
     global pose2d
     global ts
@@ -387,6 +416,8 @@ def main():
     global log_file
     global log_fieldnames
     global YAW_OFFSET
+    avg = None
+    count = 0
 
     # NOTE: might need to do time matching to get imu and optical data to match up
     #       though right now it doesn't seem necessary
@@ -406,18 +437,19 @@ def main():
 
         # TODO: update guard position here
 
-        os.system('cls')
-        print("IMU zeroed at {} deg.".format(YAW_OFFSET))
-        print("tri: " + str(triangle))
-        print("loc: " + str(origin))
-        print("2d: " + str(pose2d))
-        print(new_yaw-old_yaw)
+        # os.system('cls')
+        # print("IMU zeroed at {} deg.".format(YAW_OFFSET))
+        # print("tri: " + str(triangle))
+        # print("loc: " + str(origin))
+        # print("2d: " + str(pose2d))
+        # print(new_yaw-old_yaw)
         # print(dP)
 
         with open(log_file, 'a') as f:
             writer = csv.DictWriter(
                 f, delimiter=',', fieldnames=log_fieldnames)
             now = time.perf_counter()
+
             writer.writerow({
                 'timestamp': now,
                 'pose2d': pose2d,
@@ -428,7 +460,7 @@ def main():
                 'loop': (now-ts)*1000
             })
             ts = now
-
+        ft = time.perf_counter_ns()
 
 if __name__ == "__main__":
     main()

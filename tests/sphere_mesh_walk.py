@@ -56,17 +56,28 @@ def intersection_point(p1,p2,p3,p4):
 def adjacent_triangle(tri, ends): 
   # tri and ends contain point indices
   # returns adj triangle index and its normal
+  # global triangles
+
+  # for p in tri:
+  #   if not p in ends:
+  #     third = p
+
+  # for i in range(len(triangles)):
+  #   t = triangles[i]
+  #   if (ends[0] in t) and (ends[1] in t) and (not third in t):
+  #     n = normals[i]
+  #     return (i,n)
+  global adjacent_faces
   global triangles
 
-  for p in tri:
-    if not p in ends:
-      third = p
-
-  for i in range(len(triangles)):
-    t = triangles[i]
-    if (ends[0] in t) and (ends[1] in t) and (not third in t):
-      n = normals[i]
-      return (i,n)
+  adjacency = adjacent_faces
+  adj = adjacency[tri]
+  for t in adj:
+    # print(triangles[tri])
+    # print(triangles[t])
+    edgs = trimesh.graph.shared_edges([triangles[tri]], [triangles[t]])[0]
+    if (ends[0] in edgs and ends[1] in edgs):
+        return (t, normals[t])
 
 # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
 def rodrigues_rotation(n1, n2, v):
@@ -78,45 +89,31 @@ def rodrigues_rotation(n1, n2, v):
   cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
   return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
+mesh = trimesh.load_mesh('tests/sphere.stl')
+adjacent_faces = {}
 
-with open('tests/sphere.stl', 'rb') as f:
-    f.seek(80)
-    [facets,] = struct.unpack('I', f.read(4))
-    points = []
-    triangles = []
-    normals = []
+for a in mesh.face_adjacency:
+    if not a[0] in adjacent_faces:
+        adjacent_faces[a[0]] = a[1]
+    else:
+        adjacent_faces[a[0]] = np.append(adjacent_faces[a[0]], a[1])
+    if not a[1] in adjacent_faces:
+        adjacent_faces[a[1]] = a[0]
+    else:
+        adjacent_faces[a[1]] = np.append(adjacent_faces[a[1]], a[0])
 
-    for i in range(facets):
-        normal = list(struct.unpack('fff', f.read(12)))
-        v1 = list(struct.unpack('fff', f.read(12)))
-        v2 = list(struct.unpack('fff', f.read(12)))
-        v3 = list(struct.unpack('fff', f.read(12)))
-        normals.append(normal)
-        triangle = []
+# print(adjacent_faces)
+# print(mesh.vertices)
+# print(mesh.faces)
 
-        if v1 in points:
-            triangle.append(points.index(v1))
-        else:
-            triangle.append(len(points))
-            points.append(v1)
+# print(mesh.triangles[0])
 
-        if v2 in points:
-            triangle.append(points.index(v2))
-        else:
-            triangle.append(len(points))
-            points.append(v2)
+points = mesh.vertices
+normals = trimesh.triangles.normals(mesh.triangles)[0]
+triangles = mesh.faces
 
-        if v3 in points:
-            triangle.append(points.index(v3))
-        else:
-            triangle.append(len(points))
-            points.append(v3)
-
-        triangles.append(triangle)
-        f.seek(2, 1)
-
-points = np.array(points)
-triangles = np.array(triangles)
+# points = np.array(points)
+# triangles = np.array(triangles)
 
 # Create a new plot
 fig = pyplot.figure()
@@ -172,12 +169,12 @@ def animate(i):
   axes.quiver(*origin, *w, color='b')
   
   # four adjacent triangles
-  four = np.array([
-    vertices,
-    triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
-    triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
-    triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
-  ])
+  # four = np.array([
+  #   vertices,
+  #   triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
+  #   triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
+  #   triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
+  # ])
   t = tri.Triangulation(points[:,0], points[:,1], triangles)
   mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 
@@ -278,7 +275,7 @@ def press(event):
       origin = point_local_to_global(unit_vectors, origin, i1[1]+(0,))
       
       # calculate new triangle and vertices
-      triangle, new_norm = adjacent_triangle(vertices, [vertices[0], vertices[1]])
+      triangle, new_norm = adjacent_triangle(triangle, [vertices[0], vertices[1]])
       vertices = triangles[triangle]
       v0,v1,v2 = map(lambda v: points[v], vertices)
 
@@ -299,7 +296,7 @@ def press(event):
       origin = point_local_to_global(unit_vectors, origin, i2[1]+(0,))
       
       # calculate new triangle and vertices
-      triangle, new_norm = adjacent_triangle(vertices, [vertices[1], vertices[2]])
+      triangle, new_norm = adjacent_triangle(triangle, [vertices[1], vertices[2]])
       vertices = triangles[triangle]
       v0,v1,v2 = map(lambda v: points[v], vertices)
 
@@ -317,7 +314,7 @@ def press(event):
       origin = point_local_to_global(unit_vectors, origin, i3[1]+(0,))
       
       # calculate new triangle and vertices
-      triangle, new_norm = adjacent_triangle(vertices, [vertices[2], vertices[0]])
+      triangle, new_norm = adjacent_triangle(triangle, [vertices[2], vertices[0]])
       vertices = triangles[triangle]
       v0,v1,v2 = map(lambda v: points[v], vertices)
 
