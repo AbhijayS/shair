@@ -258,11 +258,10 @@ static void AccelTimerEventHandler(EventLoopTimer *timer)
     gy = gyro_rad_per_sec(gyRaw - g_offsets[1]);
     gz = gyro_rad_per_sec(gzRaw - g_offsets[2]);
 
-    static uint8_t ticker = 0;
-    if (++ticker >= 5 && strlen(ubit_buf_ready) != 0)
+    // static uint8_t ticker = 0;
+    if (strlen(ubit_buf_ready) != 0)
     {
-        Log_Debug("INFO: using ubit %d\n", ticker);
-        ticker = 0;
+        // ticker = 0;
         float m[3];
         char *res = strtok(ubit_buf_ready, ",");
         int i = 0;

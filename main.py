@@ -1,5 +1,6 @@
 import os
 import time
+from numpy.lib.arraysetops import union1d
 import serial
 import math
 from math import *  # fix
@@ -13,6 +14,7 @@ import struct
 import numpy as np
 import sys
 import trimesh
+from stepper import Stepper
 
 # init IMU connection
 imu = IMU()
@@ -233,7 +235,7 @@ def rodrigues_rotation(n1, n2, v):
     cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
     return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
-def translation_3d(movement_2d, delta_yaw):
+def translation_3d(movement_2d, delta_yaw, offset=False):
     global location
     global unit_vectors
     global origin
@@ -247,8 +249,20 @@ def translation_3d(movement_2d, delta_yaw):
     global triangle
     global SCALE
 
+    copy_unit_vectors = unit_vectors.copy()
+    copy_origin = origin.copy()
+    copy_vertices = vertices.copy()
+    copy_v0 = v0.copy()
+    copy_v1 = v1.copy()
+    copy_v2 = v2.copy()
+    copy_u = u.copy()
+    copy_v = v.copy()
+    copy_w = w.copy()
+    copy_triangle = triangle
+    copy_SCALE = SCALE
+    
     previous_intersection_edge = None
-    movement_vector = np.array(movement_2d+[0]) * (1/SCALE)
+    movement_vector = np.array(movement_2d + [0]) * (1/SCALE)
 
     while not np.array_equal(movement_vector, [0., 0., 0.]):
         # calculate intersections
@@ -358,6 +372,21 @@ def translation_3d(movement_2d, delta_yaw):
     ], unit_vectors)
     u,v,w = unit_vectors
 
+    if offset:
+        offset_origin = origin.copy()
+        unit_vectors = copy_unit_vectors
+        origin = copy_origin
+        vertices = copy_vertices
+        v0 = copy_v0
+        v1 = copy_v1
+        v2 = copy_v2
+        u = copy_u
+        v = copy_v
+        w = copy_w
+        triangle = copy_triangle
+        SCALE = copy_SCALE
+        return offset_origin
+
     ### END OF FUNCTION ###
 
 SCALE = 4.3
@@ -398,6 +427,9 @@ location = np.array([0., 0., 0.])
 YAW_OFFSET = -imu.get_euler_angles()[1]+90
 pose2d = (0, 0, 90)  # x,y,yaw
 ts = time.perf_counter()  # timing performance
+CUTTER_OFFSET = [0, 0.7] # x,y
+
+# guard = Stepper()
 
 def approxRollingAverage(avg, new_sample, count):
     if avg:
@@ -415,6 +447,9 @@ def main():
     global log_file
     global log_fieldnames
     global YAW_OFFSET
+    global CUTTER_OFFSET
+    # global guard
+
     avg = None
     count = 0
 
@@ -433,8 +468,10 @@ def main():
         pose2d = (pose2d[0]+dP[0], pose2d[1]+dP[1], new_yaw)
         # pose2d = (0, 0, new_yaw)
         translation_3d(list(motion), new_yaw-old_yaw)
+        cutter_location = translation_3d(CUTTER_OFFSET, 0, offset=True)
 
         # TODO: update guard position here
+        print((cutter_location[2]/600)*0.75)
 
         # os.system('cls')
         # print("IMU zeroed at {} deg.".format(YAW_OFFSET))
@@ -452,7 +489,7 @@ def main():
             writer.writerow({
                 'timestamp': now,
                 'pose2d': pose2d,
-                'pose3d': repr(origin).replace('\n', ''),
+                'pose3d': repr(cutter_location).replace('\n', ''),
                 'units': repr(unit_vectors).replace('\n', ''),
                 'triangle': triangle,
                 'optical': motion,

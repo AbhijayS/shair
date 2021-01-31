@@ -1,3 +1,4 @@
+UBIT_COM_PORT = "COM7"
 IMU_COM_PORT = "COM12" # TODO: specify your COM port here
 IMU_BAUD_RATE = 115200
 OPTICAL_DPI = 1130 # TODO: specify optical sensor DPI here or use the default one

@@ -169,12 +169,13 @@ def animate(i):
   axes.quiver(*origin, *w, color='b')
   
   # four adjacent triangles
-  # four = np.array([
-  #   vertices,
-  #   triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
-  #   triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
-  #   triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
-  # ])
+  four = np.array([
+    vertices, # [p1, p2, p3]
+    triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
+    triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
+    triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
+  ])
+  print(four)
   t = tri.Triangulation(points[:,0], points[:,1], triangles)
   mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
 
