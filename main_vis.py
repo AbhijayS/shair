@@ -58,7 +58,7 @@ def read_stl(filename):
             f.seek(2, 1)
     return (np.array(points), np.array(normals), np.array(triangles))
 
-points, normals, triangles = read_stl('tests/sphere.stl')
+points, normals, triangles = read_stl('tests/head.stl')
 prev = None
 
 def animate(i):
@@ -77,8 +77,8 @@ def animate(i):
             line = r
         if not line:
             return
-        line['units'] = eval(line['units'].replace('(','').replace(')','').replace('array',''))
-        line['pose3d'] = eval(line['pose3d'].replace('(','').replace(')','').replace('array',''))
+        line['units'] = eval(line['units'].replace('(','').replace(')','').replace('array','').replace('TrackedArray',''))
+        line['pose3d'] = eval(line['pose3d'].replace('(','').replace(')','').replace('array','').replace('TrackedArray',''))
         
         print(line['units'])
 
@@ -89,9 +89,9 @@ def animate(i):
         
         # draw location marker and unit vectors
         axes.scatter(*line['pose3d'], color='r', s=100)
-        axes.quiver(*line['pose3d'], *line['units'][0], color='r')
-        axes.quiver(*line['pose3d'], *line['units'][1], color='g')
-        axes.quiver(*line['pose3d'], *line['units'][2], color='b')
+        axes.quiver(*line['pose3d'], *line['units'][0], color='r', length=50)
+        axes.quiver(*line['pose3d'], *line['units'][1], color='g', length=50)
+        axes.quiver(*line['pose3d'], *line['units'][2], color='b', length=50)
         prev = line['pose3d']
 
     # replot mesh

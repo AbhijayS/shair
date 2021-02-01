@@ -389,14 +389,14 @@ def translation_3d(movement_2d, delta_yaw, offset=False):
 
     ### END OF FUNCTION ###
 
-SCALE = 4.3
+SCALE = 1/25.4 # mm to in
 
-points, normals, triangles, adjacency = read_stl('tests/sphere.stl')
+points, normals, triangles, adjacency = read_stl('tests/head.stl')
 # 3d stuff
 
 # starting triangle and vertices
 
-triangle = 1799
+triangle = 4432
 vertices = triangles[triangle]
 v0 = points[vertices[0]]
 v1 = points[vertices[1]]
@@ -410,18 +410,17 @@ w = np.array(normals[triangle])
 v = (v1-v0) / np.linalg.norm(v1-v0)
 u = np.cross(v, w) / np.linalg.norm(np.cross(v, w))
 unit_vectors = np.array([u, v, w])
+location = np.array([0., 0., 0.]) # always zero (relative to origin)
 
-# initial starting location
-# in reference to uvw units
-location = np.array([-0.003, 0.01, 0.])
 
-# move origin to new location
-origin = point_local_to_global(unit_vectors, origin, location)
-origin = np.array([ 0.99051657, -0.10463586, 0.07527311])
-
-# set location back to zero (origin)
-# always zero (relative to origin)
-location = np.array([0., 0., 0.])
+# rotate units to vertical
+# rotate = math.radians(185)
+# unit_vectors = np.matmul([
+#     [math.cos(rotate), -math.sin(rotate), 0],
+#     [math.sin(rotate), math.cos(rotate), 0],
+#     [0,0,1]
+# ], unit_vectors)
+# u,v,w = unit_vectors
 
 # 2d stuff
 YAW_OFFSET = -imu.get_euler_angles()[1]+90
@@ -429,7 +428,9 @@ pose2d = (0, 0, 90)  # x,y,yaw
 ts = time.perf_counter()  # timing performance
 CUTTER_OFFSET = [0, 0.7] # x,y
 
-# guard = Stepper()
+guard = Stepper()
+
+translation_3d([0,0], 185)
 
 def approxRollingAverage(avg, new_sample, count):
     if avg:
@@ -471,7 +472,12 @@ def main():
         cutter_location = translation_3d(CUTTER_OFFSET, 0, offset=True)
 
         # TODO: update guard position here
-        print((cutter_location[2]/600)*0.75)
+        # cut_length = max(0.04, cutter_location[2]-150/600*0.75)
+        # print()
+        length = round(np.interp(cutter_location[2], [150,195], [0.6,0.75]), 1)
+        # print(cutter_location[2])
+        # print(length)
+        guard.write(length)
 
         # os.system('cls')
         # print("IMU zeroed at {} deg.".format(YAW_OFFSET))
@@ -489,7 +495,7 @@ def main():
             writer.writerow({
                 'timestamp': now,
                 'pose2d': pose2d,
-                'pose3d': repr(cutter_location).replace('\n', ''),
+                'pose3d': repr(origin).replace('\n', ''),
                 'units': repr(unit_vectors).replace('\n', ''),
                 'triangle': triangle,
                 'optical': motion,

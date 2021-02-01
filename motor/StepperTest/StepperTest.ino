@@ -50,10 +50,10 @@ void loop() {
     }
   }
   if (target_inches > (pos_inches+2*inches_per_step)) {
-    myMotor->step(1, BACKWARD, SINGLE);
+    myMotor->step(1, FORWARD, SINGLE);
     pos_inches += inches_per_step;
   } else if (target_inches < (pos_inches-2*inches_per_step)) {
-    myMotor->step(1, FORWARD, SINGLE);
+    myMotor->step(1, BACKWARD, SINGLE);
     pos_inches -= inches_per_step;
   } else {
 //    Serial.println("Done");

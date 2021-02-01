@@ -5,7 +5,7 @@ class Stepper:
     DELIMETER = ","
 
     def __init__(self) -> None:
-        open()
+        self.open()
     
     def write(self, length_inches):
         self.serial.write((str(length_inches) + self.DELIMETER).encode('utf-8'))

@@ -1,3 +1,4 @@
+from main import translation_3d
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot, tri
 import matplotlib.animation as animation
@@ -89,7 +90,7 @@ def rodrigues_rotation(n1, n2, v):
   cosphi = np.dot(n1/np.linalg.norm(n1), n2/np.linalg.norm(n2))
   return v*cosphi + np.cross(a, v)*sinphi + a*np.dot(a, v)*(1-cosphi)
 
-mesh = trimesh.load_mesh('tests/sphere.stl')
+mesh = trimesh.load_mesh('tests/head.stl')
 adjacent_faces = {}
 
 for a in mesh.face_adjacency:
@@ -120,7 +121,7 @@ fig = pyplot.figure()
 axes = mplot3d.Axes3D(fig)
 
 # starting triangle and vertices
-triangle = 0
+triangle = 4432
 vertices = triangles[triangle]
 v0 = points[vertices[0]]
 v1 = points[vertices[1]]
@@ -135,6 +136,14 @@ v = (v1-v0) / np.linalg.norm(v1-v0)
 u = np.cross(v, w) / np.linalg.norm(np.cross(v, w))
 unit_vectors = np.array([u,v,w])
 
+# rotate = math.radians(185)
+# unit_vectors = np.matmul([
+#   [math.cos(rotate), -math.sin(rotate), 0],
+#   [math.sin(rotate), math.cos(rotate), 0],
+#   [0,0,1]
+# ], unit_vectors)
+# u,v,w = unit_vectors
+
 # initial starting location
 # in reference to uvw units
 location = np.array([-0.003,0.01,0.])
@@ -142,9 +151,11 @@ location = np.array([-0.003,0.01,0.])
 # move origin to new location
 origin = point_local_to_global(unit_vectors, origin, location)
 
+location = np.array([0.,0.,0.])
 # set location back to zero (origin)
 # always zero (relative to origin)
-location = np.array([0.,0.,0.])
+
+
 prev_origin = None
 def animate(i):
   global triangles
@@ -164,20 +175,21 @@ def animate(i):
   
   # draw location marker and unit vectors
   axes.scatter(*origin, color='r', s=100)
-  axes.quiver(*origin, *u, color='r')
-  axes.quiver(*origin, *v, color='g')
-  axes.quiver(*origin, *w, color='b')
+  axes.quiver(*origin, *u, color='r', length=50)
+  axes.quiver(*origin, *v, color='g', length=50)
+  axes.quiver(*origin, *w, color='b', length=50)
   
   # four adjacent triangles
-  four = np.array([
-    vertices, # [p1, p2, p3]
-    triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
-    triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
-    triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
-  ])
-  print(four)
+  # four = np.array([
+  #   vertices, # [p1, p2, p3]
+  #   triangles[adjacent_triangle(vertices, [vertices[0], vertices[1]])[0]],
+  #   triangles[adjacent_triangle(vertices, [vertices[1], vertices[2]])[0]],
+  #   triangles[adjacent_triangle(vertices, [vertices[2], vertices[0]])[0]]
+  # ])
+  # print(four)
   t = tri.Triangulation(points[:,0], points[:,1], triangles)
   mesh = axes.plot_trisurf(t, points[:,2], color=(0,0,0,0), edgecolor='Gray')
+  axes.set_box_aspect((1,1,1))
 
 def press(event):
   global location
@@ -198,7 +210,7 @@ def press(event):
   global w
   global triangle
 
-  move = 0.1
+  move = 1
   rotate = -math.radians(5)
 
   print(event.key)
